@@ -56,6 +56,62 @@ const update_bounds = (descriptor,x_up,y_up) => {
     }
 }
 
+
+const _rect_path = (descriptor,x1,y1,w,h) => {
+    const rect_P = new Path2D();
+    rect_P.rect(x1,y1,w,h)
+    descriptor.path = rect_P    
+}
+
+const _circle_path = (descriptor,centerX,centerY,radius) => {
+    if ( radius <= 0 ) return
+    const circle_P = new Path2D();
+    circle_P.arc(centerX, centerY, radius, 0, (2*Math.PI));
+    descriptor.path = circle_P    
+}
+
+const _ellipse_path = (descriptor,centerX,centerY,rad1,rad2,rotate) => {
+    if ( rad1 <= 0 ) return
+    if ( rad2 <= 0 ) return
+    const ellipse_P = new Path2D();
+    ellipse_P.ellipse(centerX, centerY, rad1, rad2, rotate, 0, (2 * Math.PI));
+    descriptor.path = ellipse_P
+}
+
+const _line_path = (descriptor,x1,y1,x2,y2) => {
+    const line_P = new Path2D();
+    line_P.moveTo(x1,y1+5)
+    line_P.lineTo(x1,y1-5)
+    line_P.lineTo(x2,y2-5)
+    line_P.lineTo(x1,y1-5)
+    line_P.lineTo(x1,y1+5)
+    line_P.closePath()
+    descriptor.path = line_P
+}
+
+const _text_path = (descriptor) => {
+    let [x,y,w,h] = descriptor.bounds
+    _rect_path(descriptor,x,y,w,h)
+}
+
+const _path_path = (descriptor) => {
+    let points = descriptor.points
+    const path_P = new Path2D();
+    let s = points.length
+    for ( let i = 0; i < s; i++ ) {
+        let p = points[i]
+        let x = p[0]
+        let y = p[0]
+        if ( i == 0 ) {
+            path_P.moveTo(x,y)
+        } else {
+            path_P.lineTo(x,y)
+        }
+    }
+    path_P.closePath()
+    descriptor.path = path_P
+}
+
 class ZList {
 
     // 
@@ -90,7 +146,6 @@ class ZList {
         }
     }
 
-
     selected_to_top() {
         if ( (this.selected >= 0) && (this.selected < this.z_list.length )) {
             let el = this.z_list[this.selected]
@@ -99,7 +154,6 @@ class ZList {
             this.selected = this.z_list.length - 1
         }
     }
-
 
     push(pars) {
         if ( !(this.redrawing) ) {
@@ -134,6 +188,8 @@ export class DrawTools extends ZList {
         this.ctxt = ctxt
         this.width = width
         this.height = height
+        this.scale_x = 1.0
+        this.scale_y = 1.0
     }
 
     setContext(ctxt) {
@@ -142,7 +198,9 @@ export class DrawTools extends ZList {
 
     clear() {
         if ( this.ctxt ) {
+            this._scale()
             this.ctxt.clearRect(0,0,this.width,this.height)
+            this._unscale()
         }
     }
 
@@ -150,6 +208,22 @@ export class DrawTools extends ZList {
         this.clear_z()
         this.clear()
     }
+
+
+    _scale() {
+        let ctxt = this.ctxt
+        if ( ctxt ) {
+            ctxt.scale(this.scale_x,this.scale_y)
+        }
+    }
+
+    _unscale() {
+        let ctxt = this.ctxt
+        if ( ctxt ) {
+            ctxt.scale((1.0/this.scale_x),(1.0/this.scale_y))
+        }
+    }
+
 
     //
     _lines_and_fill(ctxt,pars,path) {
@@ -170,12 +244,11 @@ export class DrawTools extends ZList {
     _descriptor(shape,pars) {
         if ( this._redraw_descriptor ) return this._redraw_descriptor
         else {
-            let descriptor = { "cmd" : shape, "pars" : pars, "bounds" : [] }
+            let descriptor = { "shape" : shape, "pars" : pars, "bounds" : [] }
             this.push(descriptor)
             return descriptor    
         }
     }
-
 
     text_rect(text,x,y) {
         let ctxt = this.ctxt
@@ -191,13 +264,12 @@ export class DrawTools extends ZList {
      rect(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
+            this._scale()
             let descriptor = this._descriptor("rect",pars)
             let ctxt = this.ctxt
             let [x1,y1,w,h] = pars.points
-
-            const rect_P = new Path2D();
-            rect_P.rect(x1,y1,w,h)
-            descriptor.path = rect_P
+            //
+            _rect_path(descriptor,x1,y1,w,h)
             //
             if ( pars.line && (pars.line !== "none") ) {
                 ctxt.lineWidth = pars.thick;
@@ -209,6 +281,7 @@ export class DrawTools extends ZList {
                 ctxt.fillRect(x1,y1,w,h);
             }
             descriptor.bounds = [x1,y1,w,h]
+            this._unscale()
         }
     }
 
@@ -216,13 +289,22 @@ export class DrawTools extends ZList {
     circle(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
+            this._scale()
             let descriptor = this._descriptor("circle",pars)
             let ctxt = this.ctxt
             let [centerX, centerY, radius] = pars.points
+            if ( radius <= 0 ) {
+                this._unscale()
+                return
+            }
+            //
+            _circle_path(descriptor,centerX,centerY,radius)
+            //
             ctxt.beginPath();
             ctxt.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
             this._lines_and_fill(ctxt,pars)
             descriptor.bounds = circle_bounding_rect(centerX, centerY, radius)
+            this._unscale()
         }
     }
 
@@ -231,13 +313,18 @@ export class DrawTools extends ZList {
     ellipse(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
+            this._scale()
             let descriptor = this._descriptor("ellipse",pars)
             let ctxt = this.ctxt
             let [centerX, centerY, rad1, rad2, rotate] = pars.points
+            if ( rad1 <= 0 ) { this._unscale(); return }
+            if ( rad2 <= 0 ) { this._unscale(); return }
+            _ellipse_path(descriptor,centerX,centerY,rad1,rad2,rotate)
             ctxt.beginPath();
             ctxt.ellipse(centerX, centerY, rad1, rad2, rotate, 0, 2 * Math.PI);
             this._lines_and_fill(ctxt,pars)
             descriptor.bounds = ellipse_bounding_rect(centerX, centerY, rad1, rad2)
+            this._unscale()
         }
     }
 
@@ -251,12 +338,15 @@ export class DrawTools extends ZList {
             descriptor.bounds = [x1,y1,(x2 - x1),(y2 - y1)]
             //
             if ( pars.line !== "none" ) {
+                this._scale()
+                _line_path(descriptor,x1,y1,x2,y2)
                 ctxt.beginPath();
                 ctxt.lineWidth = pars.thick;
                 ctxt.strokeStyle = pars.line;
                 ctxt.moveTo(x1,y1)
                 ctxt.lineTo(x2,y2)
                 ctxt.stroke()
+                this._unscale()
             }
 
         }
@@ -267,6 +357,7 @@ export class DrawTools extends ZList {
     text(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
+            this._scale()
             let descriptor = this._descriptor("text",pars)
             let ctxt = this.ctxt
             let [x,y] = pars.points
@@ -287,6 +378,8 @@ export class DrawTools extends ZList {
                 ctxt.fillText(text, x, y);
             }
             descriptor.bounds = this.text_rect(text,x,y)
+            _text_path(descriptor)
+            this._unscale()
         }
 
     }
@@ -296,6 +389,7 @@ export class DrawTools extends ZList {
     polygon(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
+            this._scale()
             let descriptor = this._descriptor("polygon",pars)
             let ctxt = this.ctxt
             let [cx,cy,rad] = pars.points
@@ -308,6 +402,8 @@ export class DrawTools extends ZList {
             const inradius = (edg / 2) * cot(Math.PI / sides);
             const circumradius = inradius * sec(Math.PI / sides);
             //
+            descriptor.points = []
+            //
             for (let s = 0; sides >= s; s++) {
                 const angle = (2.0 * Math.PI * s) / sides;
                 let x = circumradius * Math.cos(angle) + cx;
@@ -319,9 +415,12 @@ export class DrawTools extends ZList {
                     region.lineTo(x,y)
                 }
                 update_bounds(descriptor,x,y)
+                descriptor.points.push([x,y])
             }
             region.closePath()
             this._lines_and_fill(ctxt,pars,region)
+            _path_path(descriptor)
+            this._unscale()
         }
 
     }
@@ -330,6 +429,7 @@ export class DrawTools extends ZList {
      star(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
+            this._scale()
             let descriptor = this._descriptor("star",pars)
             let ctxt = this.ctxt
             let [cx,cy,rad] = pars.points
@@ -343,6 +443,8 @@ export class DrawTools extends ZList {
 
             ctxt.beginPath();
             let region = new Path2D();
+
+            descriptor.points = []
 
             for (let s = 0; point >= s; s++) {
                 let angle = 2.0 * Math.PI * (s / point);
@@ -361,6 +463,7 @@ export class DrawTools extends ZList {
                     region.lineTo(x,y)
                 }
                 update_bounds(descriptor,x,y)
+                descriptor.points.push([x,y])
 
                 if (!isNaN(inradius)) {
                   angle = 2.0 * Math.PI * (s / point) + Math.PI / point;
@@ -376,10 +479,13 @@ export class DrawTools extends ZList {
     
                   region.lineTo(x,y)
                   update_bounds(descriptor,x,y)
+                  descriptor.points.push([x,y])
                 }
             }
             region.closePath()
             this._lines_and_fill(ctxt,pars,region)
+            _path_path(descriptor)
+            this._unscale()
         }
     }
 
@@ -390,9 +496,9 @@ export class DrawTools extends ZList {
         for ( let i = 0; i < n; i++ ) {
             let op = this.z_list[i]
             this._redraw_descriptor = op
-            let cmd = op.cmd
+            let shape = op.shape
             let self = this
-            self[cmd](op.pars)
+            self[shape](op.pars)
             this._redraw_descriptor = false
         }
         this.redrawing = false
@@ -464,8 +570,8 @@ export class DrawTools extends ZList {
             let ctxt = this.ctxt
             let [x,y] = pars.mouse_loc
             this.redrawing = true
-            let n = this.z_list.length
-            for ( let i = 0; i < n; i++ ) {
+            let i = this.z_list.length
+            while ( (--i) >= 0 ) {
                 let path = this.z_list[i].path
                 if ( path ) {
                     if ( ctxt.isPointInPath(path, x, y) ) {
@@ -478,4 +584,16 @@ export class DrawTools extends ZList {
         return false
     }
 
+    set_scale(pars) {
+        if ( !pars ) return
+        let [sx,sy] = pars.scale
+        this.scale_x = sx
+        this.scale_y = sy
+    }
+
+    scale_redraw(pars) {
+        this.set_scale(pars)
+        this.clear()
+        this.redraw()
+    }
 }

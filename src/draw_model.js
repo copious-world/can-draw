@@ -20,7 +20,7 @@ class Drawing {
     add(shape,parameters) {
         g_commander.update( cmd => {
             let command = {
-                "cmd" : shape,
+                "shape" : shape,
                 "pars" : parameters
             }
             return command

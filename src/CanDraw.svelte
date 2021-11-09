@@ -24,9 +24,9 @@
         }
         //
         let pars = command.pars
-        if ( command.cmd !== undefined ) {
-            let cmd = command.cmd
-            drawit[cmd](pars)
+        if ( command.shape !== undefined ) {
+            let shape = command.shape
+            drawit[shape](pars)
         } else if ( command.command !== undefined  ) {
             let cmd = command.command
             drawit[cmd](pars)
@@ -45,7 +45,6 @@
 </canvas>
 </div>
 <style>
-
 
 	.canvas-viz {
 		border: solid 1px black;
