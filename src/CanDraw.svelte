@@ -2,7 +2,6 @@
     import {g_commander} from "./draw_model"
     import {DrawTools} from "./do_draw"
 
-
     export let height = 460
     export let width = 680
     export let selected = false

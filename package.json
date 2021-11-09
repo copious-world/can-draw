@@ -1,5 +1,6 @@
 {
-  "name": "SvelteComponent",
+  "name": "svelte-can-draw",
+  "version": "0.1.5",
   "svelte": "src/index.js",
   "module": "dist/index.mjs",
   "main": "dist/index.js",
@@ -14,8 +15,19 @@
     "svelte": "^3.0.0"
   },
   "keywords": [
-    "svelte"
+    "svelte", "draw", "canvas", "graphics"
   ],
+  "author": "Richard Leddy",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/copious-world/can-draw.git"
+  },
+  "homepage": "https://github.com/copious-world/can-draw#readme",
+  "funding": {
+    "type" : "GitHub Sponsors",
+    "url" : "https://github.com/sponsors/copious-world"
+  },
   "files": [
     "src",
     "dist"
