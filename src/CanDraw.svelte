@@ -14,6 +14,8 @@
     export let selected = false
     export let mouse_to_shape = false
 
+    export let canvas_mouse = { x: 0, y: 0 }
+
     // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
     //
     let the_canvas
@@ -54,9 +56,18 @@
         }
     })
 
+
+    function mouse_move(evt) {
+        const rect = the_canvas.getBoundingClientRect()
+        canvas_mouse.x = evt.clientX - rect.left
+        canvas_mouse.y = evt.clientY - rect.top
+    }
+
 </script>
 <div>
-<canvas  bind:this={the_canvas} class="canvas-viz" height='{height}px'  width='{width}px' style="width:{doc_width}px;height:{doc_height}px;left:{doc_left}px;top:{doc_top}px"   >
+<canvas  bind:this={the_canvas} class="canvas-viz" height='{height}px'  
+            width='{width}px' style="width:{doc_width}px;height:{doc_height}px;left:{doc_left}px;top:{doc_top}px"
+            on:mousemove={mouse_move} >
 
 </canvas>
 </div>
