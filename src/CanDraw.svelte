@@ -1,6 +1,7 @@
 <script>
     import {g_commander} from "./draw_model"
     import {DrawTools} from "./do_draw"
+    import { afterUpdate } from 'svelte';
 
     export let height = 460
     export let width = 680
@@ -18,7 +19,7 @@
     let the_canvas
     let ctxt = false
     let drawit = false
-    $: if ( the_canvas ) {
+    $: if ( the_canvas && !drawit ) {
         ctxt = the_canvas.getContext("2d");
         drawit = new DrawTools(ctxt,width,height)
     }
@@ -46,6 +47,13 @@
         selected = drawit.selected_object()
     })
 
+    afterUpdate(() => {
+        if ( drawit ) {
+            drawit.canvas_size(width,height)
+            drawit.redraw()
+        }
+    })
+
 </script>
 <div>
 <canvas  bind:this={the_canvas} class="canvas-viz" height='{height}px'  width='{width}px' style="width:{doc_width}px;height:{doc_height}px;left:{doc_left}px;top:{doc_top}px"   >
@@ -56,6 +64,7 @@
 
 	.canvas-viz {
 		border: solid 1px black;
+        position: absolute;
 	}
 
 </style>
