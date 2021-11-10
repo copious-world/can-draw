@@ -4,9 +4,17 @@
 
     export let height = 460
     export let width = 680
+
+    export let doc_height = height
+    export let doc_width = width
+    export let doc_left = 0
+    export let doc_top = 0
+
     export let selected = false
     export let mouse_to_shape = false
 
+    // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+    //
     let the_canvas
     let ctxt = false
     let drawit = false
@@ -40,7 +48,8 @@
 
 </script>
 <div>
-<canvas  bind:this={the_canvas} class="canvas-viz" height='{height}px'  width='{width}px' >
+<canvas  bind:this={the_canvas} class="canvas-viz" height='{height}px'  width='{width}px' style="width:{doc_width}px;height:{doc_height}px;left:{doc_left}px;top:{doc_top}px"   >
+
 </canvas>
 </div>
 <style>

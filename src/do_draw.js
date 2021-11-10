@@ -112,6 +112,62 @@ const _path_path = (descriptor) => {
     descriptor.path = path_P
 }
 
+
+
+
+
+function draw_tick_delta(ctx,width,height,x_tick_delta,y_tick_delta) {
+    //
+    let cur_x = 0
+    let cur_y = 0
+    while ( cur_x < width ) {
+        ctx.moveTo(cur_x,0)
+        ctx.lineTo(cur_x,height)
+        cur_x += x_tick_delta
+    }
+
+    while ( cur_y < height ) {
+        ctx.moveTo(0,cur_y)
+        ctx.lineTo(width,cur_y)
+        cur_y += y_tick_delta
+    }
+    //
+}
+
+ 
+function grid_on_canvas(ctx,width,height,x_mag,y_mag,ruler_interval) {
+
+    let x_interval = ruler_interval
+    if ( x_mag < 1 ) {
+        x_interval = Math.floor(100*(1/x_mag))
+    }
+    let x_tick_delta = x_mag*Math.floor(x_interval/10)
+
+    let y_interval = ruler_interval
+    if ( y_mag < 1 ) {
+        y_interval = Math.floor(100*(1/y_mag))
+    }
+    let y_tick_delta = mag*Math.floor(y_interval/10)
+
+
+    ctx.lineWidth = 1
+    ctx.fillStyle = '#000';
+    ctx.strokeStyle = '#000000';
+    ctx.beginPath();
+    draw_tick_delta(ctx,width,height,20*x_tick_delta,20*y_tick_delta)
+    ctx.stroke();
+    ctx.closePath()
+
+    ctx.strokeStyle = '#CFCFCF';
+    ctx.beginPath();
+    draw_tick_delta(ctx,width,height,2*x_tick_delta,2*y_tick_delta)
+    ctx.stroke();
+    ctx.closePath()
+
+}
+
+
+
 class ZList {
 
     // 
@@ -190,6 +246,9 @@ export class DrawTools extends ZList {
         this.height = height
         this.scale_x = 1.0
         this.scale_y = 1.0
+        //
+        this._with_grid = false
+        this.ruler_interval = 50
     }
 
     setContext(ctxt) {
@@ -492,6 +551,7 @@ export class DrawTools extends ZList {
      //
      redraw() {
         this.redrawing = true
+        this._draw_grid()
         let n = this.z_list.length
         for ( let i = 0; i < n; i++ ) {
             let op = this.z_list[i]
@@ -595,5 +655,27 @@ export class DrawTools extends ZList {
         this.set_scale(pars)
         this.clear()
         this.redraw()
+    }
+
+
+    set_grid(pars) {
+        if ( pars ) {
+            this.ruler_interval = pars.interval
+            let was_on = this._with_grid
+            this._with_grid = pars.grid_on
+            if ( was_on !== this._with_grid ) {
+                this.clear()
+                this.redraw()        
+            }
+        }
+    }
+
+
+    _draw_grid() {
+        let ctxt = this.ctxt
+        if ( ctxt && this._with_grid ) {
+            let ruler_interval = this.ruler_interval
+            grid_on_canvas(ctxt,this.width,this.height,this.scale_x,this.scale_y,ruler_interval)
+        }
     }
 }
