@@ -1,6 +1,6 @@
 <script>
-    import {g_commander} from "./draw_model"
-    import {DrawTools} from "./do_draw"
+    import { g_commander } from "./draw_model"
+    import { DrawTools } from "./do_draw"
     import { afterUpdate } from 'svelte';
 
     export let height = 460
@@ -55,7 +55,6 @@
             drawit.redraw()
         }
     })
-
 
     function mouse_move(evt) {
         const rect = the_canvas.getBoundingClientRect()
