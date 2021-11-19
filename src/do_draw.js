@@ -10,6 +10,9 @@
  */
 const sec = (n) => 1 / Math.cos(n);
 
+
+// ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+
 const circle_bounding_rect = (centerX, centerY, radius) => {
     let left = centerX  - radius
     let top = centerY - radius
@@ -489,10 +492,25 @@ export class DrawTools extends ZList {
         }
     }
 
-    text_rect(text,x,y) {
+    text_rect(text,x,y,pars) {
         let ctxt = this.ctxt
         if ( ctxt ) {
             let [w,h,top] = text_box(ctxt,text)
+            switch ( pars.textAlign ) {
+                //case "left":
+                //case "start": {
+                //    break
+                //}
+                case "center": {
+                    x -= w/2
+                    break
+                }
+                case "right":
+                case "end": {
+                    x -= w
+                    break
+                }
+            }
             return [x,y-top,w,h]
         }
         return descriptor.bounds
@@ -719,20 +737,21 @@ export class DrawTools extends ZList {
             let [x,y] = pars.points
             let text = pars.text
             //
+            ctxt.lineWidth = pars.thick;
+            ctxt.strokeStyle = pars.line;
+            ctxt.font = pars.font;
+            ctxt.textAlign = pars.textAlign;
+            ctxt.textBaseline = pars.textBaseline;
+            //
             if ( pars.rotate ) {
-                descriptor.bounds = this.text_rect(text,x,y)
+                descriptor.bounds = this.text_rect(text,x,y,pars)
                 let [x1,y1,w,h] = descriptor.bounds
                 let c_x = x1 + w/2
                 let c_y = y1 + h/2
                 this.rotate(c_x,c_y,pars.rotate)
                 ctxt.beginPath();
-                ctxt.font = pars.font;
-                ctxt.textAlign = pars.textAlign;
-                ctxt.textBaseline = pars.textBaseline;
                 //
                 if ( pars.line && (pars.line !== "none") ) {
-                    ctxt.lineWidth = pars.thick;
-                    ctxt.strokeStyle = pars.line;
                     ctxt.strokeText(text, x-c_x, y-c_y);
                 }
                 if ( pars.fill && (pars.fill !== "none") ) {
@@ -743,20 +762,17 @@ export class DrawTools extends ZList {
                 _rect_path_bounds(descriptor,x1,y1,x1 + w,y1 + h,pars.rotate)
             } else {
                 ctxt.beginPath();
-                ctxt.font = pars.font;
-                ctxt.textAlign = pars.textAlign;
-                ctxt.textBaseline = pars.textBaseline;
+                descriptor.bounds = this.text_rect(text,x,y,pars)
+                let [x1,y1,w,h] = descriptor.bounds
                 //
                 if ( pars.line && (pars.line !== "none") ) {
-                    ctxt.lineWidth = pars.thick;
-                    ctxt.strokeStyle = pars.line;
-                    ctxt.strokeText(text, x, y);
+                    ctxt.strokeText(text, x, y)
+                    //  ctxt.strokeRect(x1, y1, w, h)  for testing...
                 }
                 if ( pars.fill && (pars.fill !== "none") ) {
                     ctxt.fillStyle = this.gradient ? this.gradient : pars.fill;
                     ctxt.fillText(text, x, y);
                 }
-                descriptor.bounds = this.text_rect(text,x,y)
                 _text_path(descriptor)
             }
             this._unscale()
@@ -936,6 +952,7 @@ export class DrawTools extends ZList {
     //
     reverse_redraw() {
         this.reverse()
+        this.clear()
         this.redraw()
     }
 
