@@ -4,7 +4,7 @@
  */
  const cot = (n) => 1 / Math.tan(n);
 
-/**
+ /**
  * @param {Float} n angle
  * @returns {Float} sec
  */
@@ -143,7 +143,7 @@ const _rect_path_bounds = (descriptor,x1,y1,x2,y2,rotate) => {
     rect_lines_P.closePath()
     descriptor.path = rect_lines_P
 
-    descriptor.bounds_t = [[x11_r,y11_r],[x12_r,y12_r],[x22_r,y22_r],[x21_r,y21_r]]
+    //descriptor.bounds_t = [[x11_r,y11_r],[x12_r,y12_r],[x22_r,y22_r],[x21_r,y21_r]]
 }
 
 const _line_path_bounds = (descriptor,points,rotate) => {
@@ -203,7 +203,7 @@ const _line_path = (descriptor,x1,y1,x2,y2) => {
 
 
 const _line_path_r = (descriptor,x1,y1,x2,y2,rotate) => {
-    let points = [[x1,y1+5],[x1,y1-5],[x2,y2-5],[x2,y2+5],[x1,y1+5]]
+    let points = [[x1,y1-5],[x2,y2-5],[x2,y2+5],[x1,y1+5]]
     _line_path_bounds(descriptor,points,rotate)
 }
 
@@ -213,25 +213,162 @@ const _text_path = (descriptor) => {
     _rect_path(descriptor,x,y,w,h)
 }
 
-const _path_path = (descriptor) => {
-    let points = descriptor.points
-    const path_P = new Path2D();
-    let s = points.length
-    for ( let i = 0; i < s; i++ ) {
-        let p = points[i]
-        let x = p[0]
-        let y = p[0]
-        if ( i == 0 ) {
-            path_P.moveTo(x,y)
-        } else {
-            path_P.lineTo(x,y)
-        }
-    }
-    path_P.closePath()
-    descriptor.path = path_P
+
+
+
+function _bezier_translate(trans,x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2) {
+    let [delta_x,delta_y] = trans
+
+    return [x1 + delta_x, y1 + delta_y, cp1_x + delta_x, cp1_y + delta_y, cp2_x + delta_x, cp2_y + delta_y, x2 + delta_x, y2 + delta_y]
 }
 
 
+function _bezier_bounds(x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2) {
+    let curve = new Path2D()
+    let [x_u,y_u,cp1_tx,cp1_ty,cp2_tx,cp2_ty,end_x_u,end_y_u] = _bezier_translate([0,-5],x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2)
+    curve.moveTo(x_u,y_u)
+    curve.bezierCurveTo(cp1_tx,cp1_ty,cp2_tx,cp2_ty,end_x_u,end_y_u)
+    //
+    curve.lineTo(end_x_u,end_y_u + 10)
+    //
+    let [x_l,y_l,cp1_tx_l,cp1_ty_l,cp2_tx_l,cp2_ty_l,end_x_l,end_y_l] = _bezier_translate([0,+5],x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2)
+    curve.moveTo(x_l,y_l)
+    curve.bezierCurveTo(cp1_tx_l,cp1_ty_l,cp2_tx_l,cp2_ty_l,end_x_l,end_y_l)
+    curve.moveTo(x_l,y_l)
+    curve.lineTo(x_u,y_u)
+    curve.closePath()
+    return curve
+}
+
+
+function _bezier_rotate(rotate,x1,y1,cp1_x,cp1_y,cp2_x,cp2_y,x2, y2) {
+    let c_o_m = _center_of_mass([[x1,y1],[x2, y2]])
+    let points_hat = [[x1,y1],[cp1_x,cp1_y],[cp2_x,cp2_y],[x2, y2]]
+    _neg_p(c_o_m)
+    _translate_points(c_o_m,points_hat)
+    _rotate_points(rotate,points_hat)
+    _neg_p(c_o_m)
+    _translate_points(c_o_m,points_hat)
+    let all_pars = []
+    all_pars.push(points_hat[0][0])
+    all_pars.push(points_hat[0][1])
+    all_pars.push(points_hat[1][0])
+    all_pars.push(points_hat[1][1])
+    all_pars.push(points_hat[2][0])
+    all_pars.push(points_hat[2][1])
+    all_pars.push(points_hat[3][0])
+    all_pars.push(points_hat[3][1])
+    return all_pars
+}
+
+function _bezier_bounds_rotate(x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2, rotate) {
+    //
+    if ( (rotate === undefined) && isNaN(rotate) ) {
+        return _bezier_bounds(x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2)
+    } else {
+        let curve = new Path2D()
+        let translated_1 = _bezier_translate([0,-5],x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2)
+        let rotated_1 = _bezier_rotate(rotate,...translated_1)
+        let sx_1 = rotated_1.shift()
+        let sy_1 = rotated_1.shift()
+        curve.moveTo(sx_1,sy_1)
+        curve.bezierCurveTo(...rotated_1)
+    
+        let translated_2 = _bezier_translate([0,+5],x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2)
+        let rotated_2 = _bezier_rotate(rotate,...translated_2)
+
+        let endx_2 = rotated_2[6]
+        let endy_2 = rotated_2[7]
+        curve.lineTo(endx_2,endy_2)
+
+        let sx_2 = rotated_2.shift()
+        let sy_2 = rotated_2.shift()
+        curve.moveTo(sx_2,sy_2)
+        curve.bezierCurveTo(...rotated_2)
+        //
+        curve.moveTo(sx_2,sy_2)
+        curve.lineTo(sx_1,sy_1)
+        //
+        return curve
+    }
+    //
+}
+
+
+
+function _quadratic_translate(trans,x1, y1, cp1_x, cp1_y, x2, y2) {
+    let [delta_x,delta_y] = trans
+    return [x1 + delta_x, y1 + delta_y, cp1_x + delta_x, cp1_y + delta_y, x2 + delta_x, y2 + delta_y]
+}
+
+function _quadratic_bounds(x1, y1, cp1_x, cp1_y, x2, y2) {
+    let curve = new Path2D()
+    let [x_u,y_u,cp1_tx,cp1_ty,end_x_u,end_y_u] = _quadratic_translate([0,-5],x1, y1, cp1_x, cp1_y, x2, y2)
+    curve.moveTo(x_u,y_u)
+    curve.quadraticCurveTo(cp1_tx,cp1_ty,end_x_u,end_y_u)
+    //
+    curve.lineTo(end_x_u,end_y_u + 10)
+    //
+    let [x_l,y_l,cp1_tx_l,cp1_ty_l,end_x_l,end_y_l] = _quadratic_translate([0,+5],x1, y1, cp1_x, cp1_y, x2, y2)
+    curve.moveTo(x_l,y_l)
+    curve.quadraticCurveTo(cp1_tx_l,cp1_ty_l,end_x_l,end_y_l)
+    curve.moveTo(x_l,y_l)
+    curve.lineTo(x_u,y_u)
+    curve.closePath()
+    return curve
+}
+
+
+function _quadratic_rotate(rotate,x1,y1,cp1_x,cp1_y,x2, y2) {
+    let c_o_m = _center_of_mass([[x1,y1],[x2, y2]])
+    let points_hat = [[x1,y1],[cp1_x,cp1_y],[x2, y2]]
+    _neg_p(c_o_m)
+    _translate_points(c_o_m,points_hat)
+    _rotate_points(rotate,points_hat)
+    _neg_p(c_o_m)
+    _translate_points(c_o_m,points_hat)
+    let all_pars = []
+    all_pars.push(points_hat[0][0])
+    all_pars.push(points_hat[0][1])
+    all_pars.push(points_hat[1][0])
+    all_pars.push(points_hat[1][1])
+    all_pars.push(points_hat[2][0])
+    all_pars.push(points_hat[2][1])
+    return all_pars
+}
+
+function _quadratic_bounds_rotate(x1, y1, cp1_x, cp1_y, x2, y2, rotate) {
+    //
+    if ( (rotate === undefined) && isNaN(rotate) ) {
+        return _quadratic_bounds(x1, y1, cp1_x, cp1_y, x2, y2)
+    } else {
+        let curve = new Path2D()
+        let translated_1 = _quadratic_translate([0,-5],x1, y1, cp1_x, cp1_y, x2, y2)
+        let rotated_1 = _quadratic_rotate(rotate,...translated_1)
+        let sx_1 = rotated_1.shift()
+        let sy_1 = rotated_1.shift()
+        curve.moveTo(sx_1,sy_1)
+        curve.quadraticCurveTo(...rotated_1)
+    
+        let translated_2 = _quadratic_translate([0,+5],x1, y1, cp1_x, cp1_y, x2, y2)
+        let rotated_2 = _quadratic_rotate(rotate,...translated_2)
+
+        let endx_2 = rotated_2[4]
+        let endy_2 = rotated_2[5]
+        curve.lineTo(endx_2,endy_2)
+
+        let sx_2 = rotated_2.shift()
+        let sy_2 = rotated_2.shift()
+        curve.moveTo(sx_2,sy_2)
+        curve.quadraticCurveTo(...rotated_2)
+        //
+        curve.moveTo(sx_2,sy_2)
+        curve.lineTo(sx_1,sy_1)
+        //
+        return curve
+    }
+    //
+}
 
 
 
@@ -285,6 +422,15 @@ function grid_on_canvas(ctx,width,height,x_mag,y_mag,ruler_interval) {
 
 }
 
+
+const test_draw_path = (ctxt,descriptor) => {
+    let path = descriptor.path
+    if ( path ) {
+        ctxt.lineWidth = 2
+        ctxt.strokeStyle = 'magenta'
+        ctxt.stroke(path);
+    }
+}
 
 
 class ZList {
@@ -608,6 +754,8 @@ export class DrawTools extends ZList {
                 descriptor.bounds = [x1,y1,w,h]
             }
             //
+// test_draw_path(ctxt,descriptor)
+            //
             this._unscale()
         }
     }
@@ -646,6 +794,9 @@ export class DrawTools extends ZList {
                     ctxt.lineTo(x2,y2)
                     ctxt.stroke()
                 }
+//
+// test_draw_path(ctxt,descriptor)
+//
                 this._unscale()
             }
         }
@@ -677,18 +828,19 @@ export class DrawTools extends ZList {
                 ctxt.beginPath();
                 ctxt.stroke(curve);
                 this.unrotate(c_x,c_y,pars.rotate)
+                descriptor.path = _bezier_bounds_rotate(x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2, pars.rotate)
             } else {
                 curve.moveTo(x1,y1);
                 curve.bezierCurveTo(cp1_x, cp1_y, cp2_x, cp2_y, x2, y2);
                 ctxt.beginPath();
                 ctxt.stroke(curve);
+                descriptor.path = _bezier_bounds(x1,y1,cp1_x, cp1_y, cp2_x, cp2_y, x2, y2)
             }
-            descriptor.path = curve
+// test_draw_path(ctxt,descriptor)
             this._unscale()
             //
         }
     }
-
 
 
     // Quadratic Bézier curve
@@ -710,19 +862,25 @@ export class DrawTools extends ZList {
                 let c_x = (x1 + x2)/2
                 let c_y = (y1 + y2)/2
                 curve.moveTo(x1 - c_x,y1 - c_y);
-                curve.quadraticCurveTo(cp1_x - c_x, cp1_y - c_y, cp2_x - c_x, y2 - c_y);
+                curve.quadraticCurveTo(cp1_x - c_x, cp1_y - c_y, x2 - c_x, y2 - c_y);
                 //
                 this.rotate(c_x,c_y,pars.rotate)
                 ctxt.beginPath();
-                ctx.stroke(curve);
+                ctxt.stroke(curve);
                 this.unrotate(c_x,c_y,pars.rotate)
+                //
+                descriptor.path = _quadratic_bounds_rotate(x1, y1, cp1_x, cp1_y, x2, y2, pars.rotate)
+                //
             } else {
                 curve.moveTo(x1,y1);
                 curve.quadraticCurveTo(cp1_x, cp1_y, x2, y2);
                 ctxt.beginPath();
                 ctxt.stroke(curve);
+                descriptor.path = _quadratic_bounds(x1, y1, cp1_x, cp1_y, x2, y2)
             }
-            descriptor.path = curve
+            //
+// test_draw_path(ctxt,descriptor)
+            //
             this._unscale()
             //
         }
@@ -777,6 +935,9 @@ export class DrawTools extends ZList {
                 }
                 _text_path(descriptor)
             }
+            //
+// test_draw_path(ctxt,descriptor)
+            //
             this._unscale()
         }
 
@@ -802,6 +963,9 @@ export class DrawTools extends ZList {
             ctxt.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
             this._lines_and_fill(ctxt,pars)
             descriptor.bounds = circle_bounding_rect(centerX, centerY, radius)
+
+// test_draw_path(ctxt,descriptor)
+
             this._unscale()
             this._resets()
         }
@@ -824,6 +988,9 @@ export class DrawTools extends ZList {
             ctxt.ellipse(centerX, centerY, rad1, rad2, rotate, 0, 2 * Math.PI);
             this._lines_and_fill(ctxt,pars)
             descriptor.bounds = ellipse_bounding_rect(centerX, centerY, rad1, rad2)
+            //
+// test_draw_path(ctxt,descriptor)
+            //
             this._unscale()
         }
     }
@@ -864,7 +1031,8 @@ export class DrawTools extends ZList {
 
             ctxt.beginPath();
             this._lines_and_fill(ctxt,pars,region)
-            _path_path(descriptor)
+            descriptor.path = region
+// test_draw_path(ctxt,descriptor)
             this._unscale()
         }
 
@@ -928,7 +1096,8 @@ export class DrawTools extends ZList {
             }
 
             this._lines_and_fill(ctxt,pars,region)
-            _path_path(descriptor)
+        descriptor.path = region
+// test_draw_path(ctxt,descriptor)
             this._unscale()
         }
     }
@@ -1028,15 +1197,6 @@ export class DrawTools extends ZList {
             while ( (--i) >= 0 ) {
 
                 let path = this.z_list[i].path
-
-                /*
-                if ( this.z_list[i].bounds_t ) {
-                    pars.thick = 2
-                    pars.line = 'acqua'
-                    pars.fill = 'none'
-                    this._lines_and_fill(ctxt,pars,path)
-                }
-                */
 
                 if ( path ) {
                     if ( ctxt.isPointInPath(path, x, y) ) {
