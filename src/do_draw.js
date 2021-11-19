@@ -4,14 +4,11 @@
  */
  const cot = (n) => 1 / Math.tan(n);
 
- /**
+/**
  * @param {Float} n angle
  * @returns {Float} sec
  */
 const sec = (n) => 1 / Math.cos(n);
-
-
-// ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
 
 const circle_bounding_rect = (centerX, centerY, radius) => {
     let left = centerX  - radius
@@ -81,7 +78,7 @@ const _translate_points = (vect,points) => {
 
 const _rotate_points = (rotate,points) => {
     let r00 = Math.cos(rotate)
-    let r01 = Math.sin(rotate)
+    let r01 = -Math.sin(rotate)
     let r11 = r00
     let r10 = -r01
     //
@@ -112,7 +109,7 @@ const _neg_p = (point) => {
 
 const _rect_path_bounds = (descriptor,x1,y1,x2,y2,rotate) => {
     let r00 = Math.cos(rotate)
-    let r01 = Math.sin(rotate)
+    let r01 = -Math.sin(rotate)
     let r11 = r00
     let r10 = -r01
     //
@@ -123,27 +120,30 @@ const _rect_path_bounds = (descriptor,x1,y1,x2,y2,rotate) => {
     y1 -= c_o_m_y
     x2 -= c_o_m_x
     y2 -= c_o_m_y
-    //
+    //  top-left
     let x11_r = (r00*x1 + r01*y1) + c_o_m_x
     let y11_r = (r10*x1 + r11*y1) + c_o_m_y
-    //
-    let x12_r = (r00*x1 + r01*y2) + c_o_m_x
-    let y12_r = (r10*x1 + r11*y2) + c_o_m_y
-    //
-    let x21_r = (r00*x2 + r01*y1) + c_o_m_x
-    let y21_r = (r10*x2 + r11*y1) + c_o_m_y
-    //
+    //  bottom-right
     let x22_r = (r00*x2 + r01*y2) + c_o_m_x
     let y22_r = (r10*x2 + r11*y2) + c_o_m_y
+    //
+    // top-right x2,y1
+    let x12_r = (r00*x2 + r01*y1) + c_o_m_x
+    let y12_r = (r10*x2 + r11*y1) + c_o_m_y
+    //  bottom-left x1,y2
+    let x21_r = (r00*x1 + r01*y2) + c_o_m_x
+    let y21_r = (r10*x1 + r11*y2) + c_o_m_y
 
+    //
     const rect_lines_P = new Path2D();
     rect_lines_P.moveTo(x11_r,y11_r)
-    rect_lines_P.lineTo(x11_r,y11_r)
     rect_lines_P.lineTo(x12_r,y12_r)
-    rect_lines_P.lineTo(x21_r,y21_r)
     rect_lines_P.lineTo(x22_r,y22_r)
+    rect_lines_P.lineTo(x21_r,y21_r)
     rect_lines_P.closePath()
     descriptor.path = rect_lines_P
+
+    descriptor.bounds_t = [[x11_r,y11_r],[x12_r,y12_r],[x22_r,y22_r],[x21_r,y21_r]]
 }
 
 const _line_path_bounds = (descriptor,points,rotate) => {
@@ -670,20 +670,21 @@ export class DrawTools extends ZList {
             if ( pars.rotate ) {
                 let c_x = (x1 + x2)/2
                 let c_y = (y1 + y2)/2
-                curve.moveTo(x1,y1);
+                curve.moveTo(x1 - c_x,y1 - c_y);
                 curve.bezierCurveTo(cp1_x - c_x, cp1_y - c_y, cp2_x - c_x, cp2_y - c_y, x2 - c_x, y2 - c_y);
                 //
                 this.rotate(c_x,c_y,pars.rotate)
                 ctxt.beginPath();
-                ctx.stroke(curve);
+                ctxt.stroke(curve);
                 this.unrotate(c_x,c_y,pars.rotate)
             } else {
                 curve.moveTo(x1,y1);
                 curve.bezierCurveTo(cp1_x, cp1_y, cp2_x, cp2_y, x2, y2);
                 ctxt.beginPath();
-                ctx.stroke(curve);
+                ctxt.stroke(curve);
             }
             descriptor.path = curve
+            this._unscale()
             //
         }
     }
@@ -708,7 +709,7 @@ export class DrawTools extends ZList {
             if ( pars.rotate ) {
                 let c_x = (x1 + x2)/2
                 let c_y = (y1 + y2)/2
-                curve.moveTo(x1,y1);
+                curve.moveTo(x1 - c_x,y1 - c_y);
                 curve.quadraticCurveTo(cp1_x - c_x, cp1_y - c_y, cp2_x - c_x, y2 - c_y);
                 //
                 this.rotate(c_x,c_y,pars.rotate)
@@ -719,9 +720,10 @@ export class DrawTools extends ZList {
                 curve.moveTo(x1,y1);
                 curve.quadraticCurveTo(cp1_x, cp1_y, x2, y2);
                 ctxt.beginPath();
-                ctx.stroke(curve);
+                ctxt.stroke(curve);
             }
             descriptor.path = curve
+            this._unscale()
             //
         }
     }
@@ -813,7 +815,8 @@ export class DrawTools extends ZList {
             this._scale()
             let descriptor = this._descriptor("ellipse",pars)
             let ctxt = this.ctxt
-            let [centerX, centerY, rad1, rad2, rotate] = pars.points
+            let [centerX, centerY, rad1, rad2] = pars.points
+            let rotate = (pars.rotate !== undefined) ? pars.rotate : 0.0
             if ( rad1 <= 0 ) { this._unscale(); return }
             if ( rad2 <= 0 ) { this._unscale(); return }
             _ellipse_path(descriptor,centerX,centerY,rad1,rad2,rotate)
@@ -1014,10 +1017,27 @@ export class DrawTools extends ZList {
         if ( this.ctxt ) {
             let ctxt = this.ctxt
             let [x,y] = pars.mouse_loc
+/*
+            const circle_P = new Path2D();
+            circle_P.arc(x, y, 2, 0, (2*Math.PI));
+            pars.fill = 'purple'
+            this._lines_and_fill(ctxt,pars,circle_P)
+*/
             this.redrawing = true
             let i = this.z_list.length
             while ( (--i) >= 0 ) {
+
                 let path = this.z_list[i].path
+
+                /*
+                if ( this.z_list[i].bounds_t ) {
+                    pars.thick = 2
+                    pars.line = 'acqua'
+                    pars.fill = 'none'
+                    this._lines_and_fill(ctxt,pars,path)
+                }
+                */
+
                 if ( path ) {
                     if ( ctxt.isPointInPath(path, x, y) ) {
                         return i
