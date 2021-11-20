@@ -16,6 +16,12 @@
 
     export let canvas_mouse = { x: 0, y: 0 }
 
+    export let canvas_changed = false
+
+
+    let old_canvas_left = doc_left
+    let old_canvas_top = doc_top
+
     // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
     //
     let the_canvas
@@ -49,11 +55,27 @@
         selected = drawit.selected_object()
     })
 
+
+    let resize_happening = false
+    $: {
+        if ( ( old_canvas_left !== doc_left ) || ( old_canvas_top !== doc_top ) ) {
+            resize_happening = true
+        }
+    }
+
+    //let up_count = 0
     afterUpdate(() => {
         if ( drawit ) {
             drawit.canvas_size(width,height)
             drawit.redraw()
         }
+        if ( resize_happening ) {
+            const rect = the_canvas.getBoundingClientRect()
+            console.log(`changed canvas later maybe: ${rect.left} ${rect.top}`)
+            resize_happening = false
+            canvas_changed = true
+        }
+        //console.log(`canvas_changed ${canvas_changed}`)
     })
 
     function mouse_move(evt) {

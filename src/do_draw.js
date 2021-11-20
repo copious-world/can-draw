@@ -534,9 +534,13 @@ export class DrawTools extends ZList {
 
     clear() {
         if ( this.ctxt ) {
-            this._scale()
-            this.ctxt.clearRect(0,0,this.width,this.height)
-            this._unscale()
+            if ( ( this.scale_x < 1.0 ) || ( this.scale_y < 1.0 ) ) {
+                this.ctxt.clearRect(0,0,(this.width/this.scale_x),(this.height/this.scale_y))
+            } else {
+                if ( this.scale_y > 1.0 ) this._scale()
+                this.ctxt.clearRect(0,0,this.width,this.height)
+                if ( this.scale_y > 1.0 )this._unscale()    
+            }
         }
     }
 
@@ -1186,18 +1190,10 @@ export class DrawTools extends ZList {
         if ( this.ctxt ) {
             let ctxt = this.ctxt
             let [x,y] = pars.mouse_loc
-/*
-            const circle_P = new Path2D();
-            circle_P.arc(x, y, 2, 0, (2*Math.PI));
-            pars.fill = 'purple'
-            this._lines_and_fill(ctxt,pars,circle_P)
-*/
             this.redrawing = true
             let i = this.z_list.length
             while ( (--i) >= 0 ) {
-
                 let path = this.z_list[i].path
-
                 if ( path ) {
                     if ( ctxt.isPointInPath(path, x, y) ) {
                         return i

@@ -1,6 +1,6 @@
 {
   "name": "svelte-can-draw",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "svelte": "src/index.js",
   "module": "dist/index.mjs",
   "main": "dist/index.js",
