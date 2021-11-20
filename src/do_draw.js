@@ -18,12 +18,27 @@ const circle_bounding_rect = (centerX, centerY, radius) => {
     return [left,top,width,height]
 }
 
-const ellipse_bounding_rect = (centerX, centerY, rad1, rad2) => {
-    let left = centerX  - rad1
-    let top = centerY - rad2
-    let width = 2*rad1
-    let height = 2*rad2
-    return [left,top,width,height]
+const ellipse_bounding_rect = (centerX, centerY, rad1, rad2,rotate) => {
+    if ( rotate === 0.0 )  {
+        let left = centerX  - rad1
+        let top = centerY - rad2
+        let width = 2*rad1
+        let height = 2*rad2
+        return [left,top,width,height]    
+    } else {
+        let cs = Math.cos(rotate)
+        let sn = Math.sin(rotate)
+        //
+        let cs_sqr = cs*cs
+        let sn_sqr = sn*sn
+        let r1_sqr = rad1*rad1
+        let r2_sqr = rad2*rad2
+        //
+        let lim_x = Math.sqrt(r1_sqr*cs_sqr + r2_sqr*sn_sqr)
+        let lim_y = Math.sqrt(r1_sqr*sn_sqr + r2_sqr*cs_sqr)
+        let bbox = [centerX - lim_x,centerY - lim_y,2*lim_x,2*lim_y]
+        return bbox
+    }
 }
 
 
@@ -36,25 +51,6 @@ const text_box = (ctxt,txt) => {
     return [w,h,top]
 }
 
-const update_bounds = (descriptor,x_up,y_up) => {
-    if ( descriptor ) {
-        let [x,y,w,h] = descriptor.bounds
-        if ( x_up < x ) {
-            w += x - x_up
-            x = x_up
-        } else if ( x_up > (x + w) ) {
-            w = x_up - x
-        }
-        if ( y_up < y ) {
-            h += y - y_up
-            y = y_up
-        } else if ( y_up > (y + h) ) {
-            h = y_up - y
-        }
-        descriptor.bounds = [x,y,w,h]
-    }
-}
-
 
 const _rect_path = (descriptor,x1,y1,w,h) => {
     const rect_P = new Path2D();
@@ -62,6 +58,21 @@ const _rect_path = (descriptor,x1,y1,w,h) => {
     descriptor.path = rect_P    
 }
 
+
+const x_of_pairs  = (points) => {
+    let xs = points.map(pair => {
+        return pair[0]
+    })
+    return xs
+}
+
+
+const y_of_pairs = (points) => {
+    let ys = points.map(pair => {
+        return pair[1]
+    })
+    return ys
+}
 
 
 
@@ -143,6 +154,13 @@ const _rect_path_bounds = (descriptor,x1,y1,x2,y2,rotate) => {
     rect_lines_P.closePath()
     descriptor.path = rect_lines_P
 
+    let min_top = Math.min(y11_r,y22_r,y12_r,y21_r)
+    let min_left = Math.min(x11_r,x22_r,x12_r,x21_r)
+    let max_bottom = Math.max(y11_r,y22_r,y12_r,y21_r)
+    let max_right = Math.max(x11_r,x22_r,x12_r,x21_r)
+
+    descriptor.bounds = [min_top,min_left,max_right - min_top,max_bottom - min_top]
+
     //descriptor.bounds_t = [[x11_r,y11_r],[x12_r,y12_r],[x22_r,y22_r],[x21_r,y21_r]]
 }
 
@@ -171,6 +189,16 @@ const _line_path_bounds = (descriptor,points,rotate) => {
     }
     lines_P.closePath()
     descriptor.path = lines_P
+
+    let xs = x_of_pairs(points_hat)
+    let ys = y_of_pairs(points_hat)
+    let min_left = Math.min(...xs)
+    let min_top = Math.min(...ys)
+    let max_right = Math.max(...xs)
+    let max_bottom = Math.max(...ys)
+
+    descriptor.bounds = [min_top,min_left,max_right - min_top,max_bottom - min_top]
+
     return lines_P
 }
 
@@ -210,7 +238,7 @@ const _line_path_r = (descriptor,x1,y1,x2,y2,rotate) => {
 
 const _text_path = (descriptor) => {
     let [x,y,w,h] = descriptor.bounds
-    _rect_path(descriptor,x,y,w,h)
+    _rect_path(descriptor,x,y,w,h)  // put a path on the descriptor
 }
 
 
@@ -642,7 +670,7 @@ export class DrawTools extends ZList {
         }
     }
 
-    text_rect(text,x,y,pars) {
+    text_rect(text,x,y,pars,descriptor) {
         let ctxt = this.ctxt
         if ( ctxt ) {
             let [w,h,top] = text_box(ctxt,text)
@@ -833,12 +861,14 @@ export class DrawTools extends ZList {
                 ctxt.stroke(curve);
                 this.unrotate(c_x,c_y,pars.rotate)
                 descriptor.path = _bezier_bounds_rotate(x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2, pars.rotate)
+                _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate)
             } else {
                 curve.moveTo(x1,y1);
                 curve.bezierCurveTo(cp1_x, cp1_y, cp2_x, cp2_y, x2, y2);
                 ctxt.beginPath();
                 ctxt.stroke(curve);
                 descriptor.path = _bezier_bounds(x1,y1,cp1_x, cp1_y, cp2_x, cp2_y, x2, y2)
+                _line_path(descriptor,x1,y1,x2,y2)
             }
 // test_draw_path(ctxt,descriptor)
             this._unscale()
@@ -874,6 +904,7 @@ export class DrawTools extends ZList {
                 this.unrotate(c_x,c_y,pars.rotate)
                 //
                 descriptor.path = _quadratic_bounds_rotate(x1, y1, cp1_x, cp1_y, x2, y2, pars.rotate)
+                _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate)
                 //
             } else {
                 curve.moveTo(x1,y1);
@@ -881,6 +912,7 @@ export class DrawTools extends ZList {
                 ctxt.beginPath();
                 ctxt.stroke(curve);
                 descriptor.path = _quadratic_bounds(x1, y1, cp1_x, cp1_y, x2, y2)
+                _line_path(descriptor,x1,y1,x2,y2)
             }
             //
 // test_draw_path(ctxt,descriptor)
@@ -908,8 +940,8 @@ export class DrawTools extends ZList {
             ctxt.textBaseline = pars.textBaseline;
             //
             if ( pars.rotate ) {
-                descriptor.bounds = this.text_rect(text,x,y,pars)
-                let [x1,y1,w,h] = descriptor.bounds
+                descriptor.bounds = this.text_rect(text,x,y,pars,descriptor)
+                let [x1,y1,w,h] = descriptor.bounds  // get it up front to get a center
                 let c_x = x1 + w/2
                 let c_y = y1 + h/2
                 this.rotate(c_x,c_y,pars.rotate)
@@ -926,8 +958,8 @@ export class DrawTools extends ZList {
                 _rect_path_bounds(descriptor,x1,y1,x1 + w,y1 + h,pars.rotate)
             } else {
                 ctxt.beginPath();
-                descriptor.bounds = this.text_rect(text,x,y,pars)
-                let [x1,y1,w,h] = descriptor.bounds
+                descriptor.bounds = this.text_rect(text,x,y,pars,descriptor)
+                //let [x1,y1,w,h] = descriptor.bounds
                 //
                 if ( pars.line && (pars.line !== "none") ) {
                     ctxt.strokeText(text, x, y)
@@ -937,7 +969,7 @@ export class DrawTools extends ZList {
                     ctxt.fillStyle = this.gradient ? this.gradient : pars.fill;
                     ctxt.fillText(text, x, y);
                 }
-                _text_path(descriptor)
+                _text_path(descriptor)  // put a path on the descriptor for selection
             }
             //
 // test_draw_path(ctxt,descriptor)
@@ -984,14 +1016,14 @@ export class DrawTools extends ZList {
             let descriptor = this._descriptor("ellipse",pars)
             let ctxt = this.ctxt
             let [centerX, centerY, rad1, rad2] = pars.points
-            let rotate = (pars.rotate !== undefined) ? pars.rotate : 0.0
+            let rotate = ((pars.rotate !== undefined) && pars.rotate && (pars.rotate !== 0.0) ) ? pars.rotate : 0.0
             if ( rad1 <= 0 ) { this._unscale(); return }
             if ( rad2 <= 0 ) { this._unscale(); return }
             _ellipse_path(descriptor,centerX,centerY,rad1,rad2,rotate)
             ctxt.beginPath();
             ctxt.ellipse(centerX, centerY, rad1, rad2, rotate, 0, 2 * Math.PI);
             this._lines_and_fill(ctxt,pars)
-            descriptor.bounds = ellipse_bounding_rect(centerX, centerY, rad1, rad2)
+            descriptor.bounds = ellipse_bounding_rect(centerX, centerY, rad1, rad2, pars.rotate)
             //
 // test_draw_path(ctxt,descriptor)
             //
@@ -1022,7 +1054,7 @@ export class DrawTools extends ZList {
                 let x = circumradius * Math.cos(angle) + cx;
                 let y = circumradius * Math.sin(angle) + cy;
                 //
-                update_bounds(descriptor,x,y)
+                //update_bounds(descriptor,x,y)
                 descriptor.points.push([x,y])
             }
 
