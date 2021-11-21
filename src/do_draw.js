@@ -175,6 +175,15 @@ const _line_path_bounds = (descriptor,points,rotate) => {
         _translate_points(c_o_m,points_hat)
     }
 
+    let xs = x_of_pairs(points_hat)
+    let ys = y_of_pairs(points_hat)
+    let min_left = Math.min(...xs)
+    let min_top = Math.min(...ys)
+    let max_right = Math.max(...xs)
+    let max_bottom = Math.max(...ys)
+
+    descriptor.bounds = [min_left,min_top,max_right - min_left,max_bottom - min_top]
+
     let p0 = points_hat.shift()
     let x = p0[0]
     let y = p0[1]
@@ -190,14 +199,6 @@ const _line_path_bounds = (descriptor,points,rotate) => {
     lines_P.closePath()
     descriptor.path = lines_P
 
-    let xs = x_of_pairs(points_hat)
-    let ys = y_of_pairs(points_hat)
-    let min_left = Math.min(...xs)
-    let min_top = Math.min(...ys)
-    let max_right = Math.max(...xs)
-    let max_bottom = Math.max(...ys)
-
-    descriptor.bounds = [min_top,min_left,max_right - min_top,max_bottom - min_top]
 
     return lines_P
 }
@@ -467,7 +468,7 @@ class ZList {
     constructor() {
         this.z_list = []
         this.redrawing = false
-        this.selected = 0
+        this.selected = -1
         this._selected_object = false
         this._redraw_descriptor = false
     }
@@ -476,6 +477,10 @@ class ZList {
         if ( (ith >= 0) && (ith < this.z_list.length) ) {
             this.selected = ith
         }
+    }
+
+    deselect() {
+        this.selected = -1
     }
 
     selected_object() {
@@ -757,7 +762,7 @@ export class DrawTools extends ZList {
             let ctxt = this.ctxt
             let [x1,y1,w,h] = pars.points
             //
-            if ( pars.rotate ) {
+            if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                 let c_x = (x1 + w/2)
                 let c_y = (y1 + h/2)
                 _rect_path_bounds(descriptor,x1,y1,(x1 + w),(y1 + h),pars.rotate)
@@ -803,7 +808,7 @@ export class DrawTools extends ZList {
             //
             if ( pars.line !== "none" ) {
                 this._scale()
-                if ( pars.rotate ) {
+                if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                     let c_x = (x1 + x2)/2
                     let c_y = (y1 + y2)/2
                     this.rotate(c_x,c_y,pars.rotate)
@@ -850,7 +855,7 @@ export class DrawTools extends ZList {
             ctxt.strokeStyle = pars.line;
             //
             let curve = new Path2D();
-            if ( pars.rotate ) {
+            if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                 let c_x = (x1 + x2)/2
                 let c_y = (y1 + y2)/2
                 curve.moveTo(x1 - c_x,y1 - c_y);
@@ -892,7 +897,7 @@ export class DrawTools extends ZList {
             ctxt.strokeStyle = pars.line;
             //
             let curve = new Path2D();
-            if ( pars.rotate ) {
+            if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                 let c_x = (x1 + x2)/2
                 let c_y = (y1 + y2)/2
                 curve.moveTo(x1 - c_x,y1 - c_y);
@@ -939,7 +944,7 @@ export class DrawTools extends ZList {
             ctxt.textAlign = pars.textAlign;
             ctxt.textBaseline = pars.textBaseline;
             //
-            if ( pars.rotate ) {
+            if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                 descriptor.bounds = this.text_rect(text,x,y,pars,descriptor)
                 let [x1,y1,w,h] = descriptor.bounds  // get it up front to get a center
                 let c_x = x1 + w/2
@@ -1023,7 +1028,7 @@ export class DrawTools extends ZList {
             ctxt.beginPath();
             ctxt.ellipse(centerX, centerY, rad1, rad2, rotate, 0, 2 * Math.PI);
             this._lines_and_fill(ctxt,pars)
-            descriptor.bounds = ellipse_bounding_rect(centerX, centerY, rad1, rad2, pars.rotate)
+            descriptor.bounds = ellipse_bounding_rect(centerX, centerY, rad1, rad2,rotate)
             //
 // test_draw_path(ctxt,descriptor)
             //
@@ -1059,7 +1064,7 @@ export class DrawTools extends ZList {
             }
 
             let region = false
-            if ( pars.rotate ) {
+            if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                 region = _line_path_bounds(descriptor,descriptor.points,pars.rotate)
             } else {
                 region = _line_path_bounds(descriptor,descriptor.points)
@@ -1125,7 +1130,7 @@ export class DrawTools extends ZList {
             }
             region.closePath()
 
-            if ( pars.rotate ) {
+            if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                 region = _line_path_bounds(descriptor,descriptor.points,pars.rotate)
             } else {
                 region = _line_path_bounds(descriptor,descriptor.points)
@@ -1178,6 +1183,11 @@ export class DrawTools extends ZList {
         if ( !pars ) return
         let i = pars.select
         super.select(i)
+    }
+
+    deselect(pars) {
+        if ( !pars ) return
+        super.deselect()
     }
 
     //
