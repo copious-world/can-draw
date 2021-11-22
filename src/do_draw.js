@@ -169,11 +169,10 @@ const _rect_path_bounds = (descriptor,x1,y1,x2,y2,rotate) => {
     let max_right = Math.max(x11_r,x22_r,x12_r,x21_r)
 
     descriptor.bounds = [min_top,min_left,max_right - min_top,max_bottom - min_top]
-
-    //descriptor.bounds_t = [[x11_r,y11_r],[x12_r,y12_r],[x22_r,y22_r],[x21_r,y21_r]]
+    descriptor.final_path = [[x11_r,y11_r],[x12_r,y12_r],[x22_r,y22_r],[x21_r,y21_r]]
 }
 
-const _line_path_bounds = (descriptor,points,rotate) => {
+const _line_path_bounds = (descriptor,points,rotate,store_rotation) => {
     let points_hat = [].concat(points)
     if ( (rotate !== undefined) && !isNaN(rotate) ) {
         let c_o_m = _center_of_mass(points_hat)
@@ -192,6 +191,9 @@ const _line_path_bounds = (descriptor,points,rotate) => {
     let max_bottom = Math.max(...ys)
 
     descriptor.bounds = [min_left,min_top,max_right - min_left,max_bottom - min_top]
+    if ( store_rotation ) {
+        descriptor.final_path = [].concat(points_hat)
+    }
 
     let p0 = points_hat.shift()
     let x = p0[0]
@@ -207,7 +209,6 @@ const _line_path_bounds = (descriptor,points,rotate) => {
     }
     lines_P.closePath()
     descriptor.path = lines_P
-
 
     return lines_P
 }
@@ -242,7 +243,7 @@ const _line_path = (descriptor,x1,y1,x2,y2) => {
 
 const _line_path_r = (descriptor,x1,y1,x2,y2,rotate) => {
     let points = [[x1,y1-5],[x2,y2-5],[x2,y2+5],[x1,y1+5]]
-    _line_path_bounds(descriptor,points,rotate)
+    _line_path_bounds(descriptor,points,rotate,true)
 }
 
 
@@ -1046,8 +1047,36 @@ export class DrawTools extends ZList {
     }
 
 
+    //  path
+    path(pars) {
+        if ( !pars ) return
+        if ( this.ctxt ) {
+            this._scale()
+            let descriptor = this._descriptor("path",pars)
+            let ctxt = this.ctxt
+            let points = pars.points
+            descriptor.points = points
 
-    //
+            let rotate = pars.rotate
+            if ( (rotate !== undefined) && !isNaN(rotate) ) {
+                let c_o_m = _center_of_mass(points)
+                _neg_p(c_o_m)
+                _translate_points(c_o_m,points)
+                _rotate_points(rotate,points)
+                _neg_p(c_o_m)
+                _translate_points(c_o_m,points)
+            }
+
+            region = _line_path_bounds(descriptor,descriptor.points,false,true)
+
+            this._lines_and_fill(ctxt,pars,region)
+            descriptor.path = region
+            this._unscale()
+        }
+    }
+
+
+    //  polygon
     polygon(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
@@ -1074,9 +1103,9 @@ export class DrawTools extends ZList {
 
             let region = false
             if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
-                region = _line_path_bounds(descriptor,descriptor.points,pars.rotate)
+                region = _line_path_bounds(descriptor,descriptor.points,pars.rotate,true)
             } else {
-                region = _line_path_bounds(descriptor,descriptor.points)
+                region = _line_path_bounds(descriptor,descriptor.points,false,true)
             }
 
             ctxt.beginPath();
@@ -1088,7 +1117,9 @@ export class DrawTools extends ZList {
 
     }
 
-    //
+
+
+    //  star
     star(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
@@ -1140,13 +1171,13 @@ export class DrawTools extends ZList {
             region.closePath()
 
             if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
-                region = _line_path_bounds(descriptor,descriptor.points,pars.rotate)
+                region = _line_path_bounds(descriptor,descriptor.points,pars.rotate,true)
             } else {
-                region = _line_path_bounds(descriptor,descriptor.points)
+                region = _line_path_bounds(descriptor,descriptor.points,false,true)
             }
 
             this._lines_and_fill(ctxt,pars,region)
-        descriptor.path = region
+            descriptor.path = region
 // test_draw_path(ctxt,descriptor)
             this._unscale()
         }
