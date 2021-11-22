@@ -118,6 +118,15 @@ const _neg_p = (point) => {
     point[1] = -point[1]
 }
 
+
+const _line_bounds = (x1,y1,x2,y2) => {
+    let left = Math.min(x1,x2)
+    let right = Math.max(x1,x2)
+    let top = Math.min(y1,y2)
+    let bottom = Math.max(y1,y2)
+    return [left,top,(right - left),(bottom - top)]
+}
+
 const _rect_path_bounds = (descriptor,x1,y1,x2,y2,rotate) => {
     let r00 = Math.cos(rotate)
     let r01 = -Math.sin(rotate)
@@ -819,11 +828,11 @@ export class DrawTools extends ZList {
                     ctxt.lineTo((x2-c_x),(y2-c_y))
                     ctxt.stroke()
                     this.unrotate(c_x,c_y,pars.rotate)
-                    _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate)
+                    _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate)  // path only
                 } else {
-                    descriptor.bounds = [x1,y1,(x2 - x1),(y2 - y1)]
+                    descriptor.bounds = _line_bounds(x1,y1,x2,y2)
                     //
-                    _line_path(descriptor,x1,y1,x2,y2)
+                    _line_path(descriptor,x1,y1,x2,y2)      // path_only
                     ctxt.beginPath();
                     ctxt.lineWidth = pars.thick;
                     ctxt.strokeStyle = pars.line;
