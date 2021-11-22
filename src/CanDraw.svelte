@@ -63,10 +63,11 @@
         }
     }
 
-    //let up_count = 0
+    let up_count = 0
     afterUpdate(() => {
         if ( drawit ) {
             drawit.canvas_size(width,height)
+            drawit.clear()
             drawit.redraw()
         }
         if ( resize_happening ) {
