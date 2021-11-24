@@ -10,6 +10,22 @@
  */
 const sec = (n) => 1 / Math.cos(n);
 
+
+const _rects_intersect = (rect1,rect2) => {
+    let [x1,y1,w1,h1] = rect1
+    let [x2,y2,w2,h2] = rect2
+
+    let r1 = x1 + w1
+    let r2 = x2 + w2
+    let b1 = y1 + h1
+    let b2 = y2 + h2
+
+    if ( w1 <= 0 || h1 <= 0 || w2 <= 0 || h2 <= 0 ) { return false }    
+    if ( r1 <= x2 || r2 <= x1  ) return false;
+    if ( b1 <= y2 || b2 <= y1  ) return false;
+    return true;
+}
+
 const circle_bounding_rect = (centerX, centerY, radius) => {
     let left = centerX  - radius
     let top = centerY - radius
@@ -541,6 +557,16 @@ class ZList {
 
     z_top() {
         return (this.z_list.length - 1)
+    }
+
+    z_list_deep_clone() {
+        let zclone = JSON.parse(JSON.stringify(this.z_list))
+        return zclone
+    }
+
+    z_list_replace(z_replacement) {
+        this.z_list = z_replacement
+        this.selected = -1
     }
 }
 
@@ -1184,6 +1210,29 @@ export class DrawTools extends ZList {
     }
 
 
+    //
+    bounding_path(pars) {
+        if ( !pars ) return
+        if ( this.ctxt ) {
+            this.clear()
+            this.redraw()
+            //
+            this.clear()
+            this.redraw()
+            //
+            let i = pars.index
+            let state = pars.state
+            if ( state ) {
+                let descriptor = this.z_list[i]
+                let ctxt = this.ctxt
+                this._scale()
+                test_draw_path(ctxt,descriptor)
+                this._unscale()
+            }
+            //
+        }
+    }
+
 
     //
     redraw() {
@@ -1278,6 +1327,7 @@ export class DrawTools extends ZList {
                 let path = this.z_list[i].path
                 if ( path ) {
                     if ( ctxt.isPointInPath(path, x, y) ) {
+                        this.redrawing = false
                         return i
                     }
                 }
@@ -1286,6 +1336,43 @@ export class DrawTools extends ZList {
         }
         return false
     }
+
+    bounds_intersect(pars) {
+        if ( !pars ) return
+        let test_rect = pars.rect
+        this.redrawing = true
+        let i = this.z_list.length
+        while ( (--i) >= 0 ) {
+            let descriptor = this.z_list[i]
+            if ( descriptor ) {
+                if ( _rects_intersect(test_rect,descriptor.bounds) ) {
+                    this.redrawing = false
+                    return i
+                }
+            }
+        }
+        this.redrawing = false
+    }
+
+
+    all_bounds_intersect(pars) {
+        if ( !pars ) return
+        let test_rect = pars.rect
+        this.redrawing = true
+        let i = this.z_list.length
+        let sel_list = []
+        while ( (--i) >= 0 ) {
+            let descriptor = this.z_list[i]
+            if ( descriptor ) {
+                if ( _rects_intersect(test_rect,descriptor.bounds) ) {
+                    sel_list.push(i)
+                }
+            }
+        }
+        this.redrawing = false
+        return sel_list
+    }
+
 
     set_scale(pars) {
         if ( !pars ) return
@@ -1300,10 +1387,18 @@ export class DrawTools extends ZList {
         this.redraw()
     }
 
-
+    // 
     remove_seleted() {
         this.selected_to_top()
         this.pop()
+        this.clear()
+        this.redraw()
+    }
+
+    z_list_replace(pars) {
+        if ( !pars ) return
+        let z_replacement = pars.z_list
+        super.z_list_replace(z_replacement)
         this.clear()
         this.redraw()
     }

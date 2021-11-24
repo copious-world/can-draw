@@ -14,6 +14,8 @@
     export let selected = false
     export let mouse_to_shape = false
 
+    export let multi_select = false
+
     export let canvas_mouse = { x: 0, y: 0 }
 
     export let canvas_changed = false
@@ -50,8 +52,10 @@
             drawit.update(pars)
         } else if ( command.searching !== undefined ) {
             mouse_to_shape = drawit.mouse_in_shape(pars)
+        } else if ( command.multi_select !== undefined ) {
+            multi_select = drawit.all_bounds_intersect(pars)
         }
-
+        //
         selected = drawit.selected_object()
     })
 
