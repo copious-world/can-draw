@@ -1232,7 +1232,29 @@ export class DrawTools extends ZList {
             //
         }
     }
-
+    bounding_paths(pars) {
+        if ( !pars ) return
+        if ( this.ctxt ) {
+            this.clear()
+            this.redraw()
+            //
+            this.clear()
+            this.redraw()
+            //
+            let all_i = pars.list
+            let state = pars.state
+            if ( state ) {
+                let ctxt = this.ctxt
+                this._scale()
+                for ( let i of all_i ) {
+                    let descriptor = this.z_list[i]
+                    test_draw_path(ctxt,descriptor)    
+                }
+                this._unscale()
+            }
+            //
+        }
+    }
 
     //
     redraw() {
