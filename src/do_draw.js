@@ -1363,10 +1363,7 @@ export class DrawTools extends ZList {
     }
 
 
-    all_bounds_intersect(pars) {
-        if ( !pars ) return
-        let test_rect = pars.rect
-        this.redrawing = true
+    _all_bounds_intersect(test_rect) {
         let i = this.z_list.length
         let sel_list = []
         while ( (--i) >= 0 ) {
@@ -1377,6 +1374,14 @@ export class DrawTools extends ZList {
                 }
             }
         }
+        return sel_list
+    }
+
+    all_bounds_intersect(pars) {
+        if ( !pars ) return
+        let test_rect = pars.rect
+        this.redrawing = true
+        let sel_list = this._all_bounds_intersect(test_rect)
         this.redrawing = false
         return sel_list
     }
@@ -1467,19 +1472,23 @@ export class DrawTools extends ZList {
             ctxt.strokeText('G', x1, y1)
             ctxt.restore()
 
+            if ( descriptor.do_drawing_state ) {
+                let sel_list = this._all_bounds_intersect(descriptor.bounds)
+                descriptor.select_list = sel_list
+                descriptor.do_draw_selections = MediaStreamTrackAudioSourceNode
+            }
+
             let all_i = descriptor.select_list
             let state = descriptor.do_draw_selections
 
             if ( state ) {
                 let ctxt = this.ctxt
-                this._scale()
                 for ( let i of all_i ) {
                     if ( i !== this.selected ) {
                         let descriptor = this.z_list[i]
                         test_draw_path(ctxt,descriptor)                            
                     }
                 }
-                this._unscale()
             }
 
             this._unscale()
