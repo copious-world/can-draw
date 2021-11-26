@@ -543,7 +543,9 @@ class ZList {
     }
 
     pop() {
-        this.z_list.pop()
+        if ( (this.selected >= 0) && (this.selected < this.z_list.length )) {
+            this.z_list.pop()
+        }
     }
 
     reverse() {
@@ -557,6 +559,14 @@ class ZList {
 
     z_top() {
         return (this.z_list.length - 1)
+    }
+
+    z_top_object() {
+        let n = (this.z_list.length - 1)
+        if ( n >= 0 ) {
+            return this.z_list[n]
+        }
+        return false
     }
 
     z_list_deep_clone() {
@@ -832,7 +842,6 @@ export class DrawTools extends ZList {
             this._unscale()
         }
     }
-
 
     //
     line(pars) {
@@ -1232,29 +1241,6 @@ export class DrawTools extends ZList {
             //
         }
     }
-    bounding_paths(pars) {
-        if ( !pars ) return
-        if ( this.ctxt ) {
-            this.clear()
-            this.redraw()
-            //
-            this.clear()
-            this.redraw()
-            //
-            let all_i = pars.list
-            let state = pars.state
-            if ( state ) {
-                let ctxt = this.ctxt
-                this._scale()
-                for ( let i of all_i ) {
-                    let descriptor = this.z_list[i]
-                    test_draw_path(ctxt,descriptor)    
-                }
-                this._unscale()
-            }
-            //
-        }
-    }
 
     //
     redraw() {
@@ -1446,4 +1432,86 @@ export class DrawTools extends ZList {
             grid_on_canvas(ctxt,this.width,this.height,this.scale_x,this.scale_y,ruler_interval)
         }
     }
+
+
+
+
+    group(pars) {
+        if ( !pars ) return
+        if ( this.ctxt ) {
+            this._scale()
+            let descriptor = this._descriptor("group",pars)
+            let ctxt = this.ctxt
+            let [x1,y1,w,h] = pars.points
+            _rect_path(descriptor,x1,y1,w,h)
+            if ( pars.line && (pars.line !== "none") ) {
+                ctxt.save()
+                ctxt.lineWidth = pars.thick;
+                ctxt.strokeStyle = pars.line;
+                ctxt.setLineDash([5, 3]);
+                ctxt.strokeRect(x1,y1,w,h)
+                ctxt.restore()
+            }
+            if ( pars.fill && (pars.fill !== "none") ) {
+                ctxt.fillStyle = this.gradient ? this.gradient : pars.fill;
+                ctxt.fillRect(x1,y1,w,h);
+            }
+            descriptor.bounds = [x1,y1,w,h]
+
+            ctxt.save()
+            ctxt.lineWidth = 1;
+            ctxt.strokeStyle ='rgba(200,127,127,0.9)';
+            ctxt.font = "12px cursive";
+            ctxt.textAlign = "center";
+            ctxt.textBaseline = "middle";
+            ctxt.strokeText('G', x1, y1)
+            ctxt.restore()
+
+            let all_i = descriptor.select_list
+            let state = descriptor.do_draw_selections
+
+            if ( state ) {
+                let ctxt = this.ctxt
+                this._scale()
+                for ( let i of all_i ) {
+                    if ( i !== this.selected ) {
+                        let descriptor = this.z_list[i]
+                        test_draw_path(ctxt,descriptor)                            
+                    }
+                }
+                this._unscale()
+            }
+
+            this._unscale()
+        }
+    }
+
+    remove_top_if_empty_group(pars) {
+        if ( !pars ) return
+        let descriptor = this.z_top_object()
+        if ( descriptor.shape === 'group' ) {
+            let children = descriptor.children
+            if ( !children ) {
+                let exception = pars.except
+                if ( (exception !== undefined) && (this.selected === exception) ) return
+                this.z_list.pop()
+            }
+        }
+    }
+
+
+    update_selector_group(pars) {
+        if ( !pars ) return
+        let descriptor = this.z_top_object()
+        if ( descriptor.shape === 'group' ) {
+            let children = descriptor.children
+            if ( !children ) {
+                let all_i = pars.list
+                let state = pars.state
+                descriptor.select_list = pars.list
+                descriptor.do_draw_selections = true
+            }
+        }
+    }
+
 }
