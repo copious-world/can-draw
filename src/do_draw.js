@@ -1345,6 +1345,28 @@ export class DrawTools extends ZList {
         return false
     }
 
+    //
+    mouse_in_shapes_all(mouse_loc) {
+        if ( this.ctxt ) {
+            let ctxt = this.ctxt
+            let [x,y] = mouse_loc
+            let i = this.z_list.length
+            let shape_finds = []
+            while ( (--i) >= 0 ) {
+                let path = this.z_list[i].path
+                if ( path ) {
+                    if ( ctxt.isPointInPath(path, x, y) ) {
+                        this.redrawing = false
+                        shape_finds.push(i)
+                    }
+                }
+            }
+            return shape_finds
+        }
+        return false
+    }
+
+    //
     bounds_intersect(pars) {
         if ( !pars ) return
         let test_rect = pars.rect
@@ -1400,12 +1422,50 @@ export class DrawTools extends ZList {
         this.redraw()
     }
 
+
+
+    is_group_selection() {
+        let descriptor = this.z_top_object()
+        if ( descriptor.shape === 'group' ) {
+            let children = descriptor.children
+            if ( !children ) {
+                if ( (descriptor.select_list !== undefined) && Array.isArray(descriptor.select_list) ) {
+                    //
+                    return (descriptor.select_list.length > 0) 
+                    //
+                }
+            }
+        }
+    }
+
     // 
-    remove_seleted() {
-        this.selected_to_top()
-        this.pop()
-        this.clear()
-        this.redraw()
+    remove_selected() {
+        if ( this.is_group_selection() ) {
+            let descriptor = this.z_top_object()
+            let del_list = descriptor.select_list
+            del_list.sort()
+            del_list.reverse()
+            let exclusions = descriptor.exclusion_list
+            if ( exclusions === undefined ) {
+                exclusions = []
+                descriptor.exclusion_list = exclusions
+            }
+    
+            for ( let ith of del_list ) {
+                if ( exclusions.indexOf(ith) < 0 ) {
+                    super.select(ith)
+                    this.selected_to_top()
+                    this.pop()
+                }
+            }
+            this.clear()
+            this.redraw()
+        } else {
+            this.selected_to_top()
+            this.pop()
+            this.clear()
+            this.redraw()    
+        }
     }
 
     z_list_replace(pars) {
@@ -1475,24 +1535,76 @@ export class DrawTools extends ZList {
             if ( descriptor.do_drawing_state ) {
                 let sel_list = this._all_bounds_intersect(descriptor.bounds)
                 descriptor.select_list = sel_list
-                descriptor.do_draw_selections = MediaStreamTrackAudioSourceNode
+                descriptor.do_draw_selections = true
+            }
+            // pars.role
+            if ( pars.role ) {
+                descriptor.role = pars.role
             }
 
             let all_i = descriptor.select_list
             let state = descriptor.do_draw_selections
+            let exclusions = descriptor.exclusion_list
+            if ( exclusions === undefined ) {
+                exclusions = []
+                descriptor.exclusion_list = exclusions
+            }
 
             if ( state ) {
                 let ctxt = this.ctxt
                 for ( let i of all_i ) {
                     if ( i !== this.selected ) {
-                        let descriptor = this.z_list[i]
-                        test_draw_path(ctxt,descriptor)                            
+                        if ( exclusions.indexOf(i) < 0 ) {
+                            let child_descriptor = this.z_list[i]
+                            test_draw_path(ctxt,child_descriptor)    
+                        }
                     }
                 }
             }
 
             this._unscale()
         }
+    }
+
+    search_selection_toggle(pars) {
+        if ( !pars ) return
+        let descriptor = this.z_top_object()
+        if ( descriptor.shape === 'group' ) {
+            let children = descriptor.children
+            if ( !children ) {
+                let mouse_loc = pars.mouse_loc
+                let found_shapes = this.mouse_in_shapes_all(mouse_loc)
+                if ( !found_shapes ) return
+                //
+                let depth = pars.depth ? parseInt(pars.depth) : 1
+
+                found_shapes.sort()
+                found_shapes.reverse()
+                let exclusions = descriptor.exclusion_list
+                if ( exclusions === undefined || !Array.isArray(exclusions) ) {
+                    exclusions = []
+                    descriptor.exclusion_list = exclusions
+                }
+                //
+                if ( found_shapes.length ) {  // z_top()
+                    if ( found_shapes[0] === this.z_top() ) {
+                        found_shapes.shift()
+                    }
+                    while ( found_shapes.length && (depth > 0) ) {
+                        depth--
+                        let ith = found_shapes.shift()
+                        let ex_ith = exclusions.indexOf(ith)
+                        if ( ex_ith >= 0 ) {
+                            exclusions.splice(ex_ith,1)
+                        } else {
+                            exclusions.push(ith)
+                        }
+                    }
+                }
+                //
+            }
+        }
+
     }
 
     remove_top_if_empty_group(pars) {
@@ -1515,8 +1627,6 @@ export class DrawTools extends ZList {
         if ( descriptor.shape === 'group' ) {
             let children = descriptor.children
             if ( !children ) {
-                let all_i = pars.list
-                let state = pars.state
                 descriptor.select_list = pars.list
                 descriptor.do_draw_selections = true
             }
