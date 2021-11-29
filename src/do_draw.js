@@ -1153,6 +1153,27 @@ export class DrawTools extends ZList {
     }
 
 
+    change_star_radius(descriptor,ctrl_point,dx,dy,no_r_change) {
+        if ( descriptor === undefined || !(descriptor) ) return
+        let points = descriptor.pars.points
+        //let final_path = descriptor.final_path
+        let cx = points[0]
+        let cy = points[1]
+        //
+        //let sample_point = final_path[0]
+        let outer_x = ctrl_point.x
+        let outer_y = ctrl_point.y
+        //
+        let t_x = (outer_x - cx)
+        let t_y = (outer_y - cy)//
+        //
+        let R = Math.sqrt(t_x*t_x + t_y*t_y)
+        if ( !no_r_change ) {
+            points[2] = R*1.5
+        }
+        return points
+    }
+
 
     //  star
     star(pars) {
