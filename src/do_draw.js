@@ -26,6 +26,25 @@ const _rects_intersect = (rect1,rect2) => {
     return true;
 }
 
+const max_box = (group_boxes) => {
+    let min_x = 2000
+    let min_y = 2000
+    let max_x = 0
+    let max_y = 0
+    for ( let box of group_boxes ) {
+        let [x,y,w,h] = box
+        if ( x < min_x ) min_x = x
+        if ( y < min_y ) min_y = y
+        x += w
+        y += h
+        if ( x > max_x ) max_x = x
+        if ( y > max_y ) max_y = y
+    }
+    let w_hat = max_x - min_x
+    let h_hat = max_y - min_y
+    return [min_x,min_y,w_hat,h_hat]
+}
+
 const circle_bounding_rect = (centerX, centerY, radius) => {
     let left = centerX  - radius
     let top = centerY - radius
@@ -513,6 +532,13 @@ class ZList {
         if ( (this.selected >= 0) && (this.selected < this.z_list.length) ) {
             this._selected_object = this.z_list[this.selected]
             return this._selected_object
+        }
+        return false
+    }
+
+    ith_object(ith) {
+        if ( (ith >= 0) && (ith < this.z_list.length) ) {
+            return(this.z_list[ith])
         }
         return false
     }
@@ -1311,12 +1337,30 @@ export class DrawTools extends ZList {
     //
     send_bottom(pars) {
         if ( !pars ) return
-        let i = pars.select
-        if ( i === false ) {
-            i = this.selected
+        if ( Array.isArray(pars.select) ) {
+            let selects = [].concat(pars.select)
+            let top_i = this.z_list.length - 1
+            let i = selects.indexOf(top_i)
+            selects.splice(i,1)
+            selects.sort()
+            selects.reverse()
+            let descriptors = selects.map(ith => { return this.z_list[ith]} )
+            for ( let i = 0; i < selects.length; i++ ) {
+                let ith = selects[i]
+                this.z_list.splice(ith,1)
+            }
+            for ( let descriptor of descriptors ) {
+                this.z_list.unshift(descriptor)  // push onto the front
+            }
+            super.select(selects.length - 1)
+        } else {
+            let i = pars.select
+            if ( i === false ) {
+                i = this.selected
+            }
+            super.select(i)
+            this.selected_to_bottom()    
         }
-        super.select(i)
-        this.selected_to_bottom()
         this.clear()
         this.redraw()
     }
@@ -1324,14 +1368,29 @@ export class DrawTools extends ZList {
     //
     send_top(pars) {
         if ( !pars ) return 
-        let i = pars.select
-        if ( i === false ) {
-            i = this.selected
+        if ( Array.isArray(pars.select) ) {
+            let selects = pars.select
+            selects.sort()
+            let descriptors = selects.map(ith => { return this.z_list[ith]} )
+            selects.reverse()
+            for ( let i = 0; i < selects.length; i++ ) {
+                let ith = selects[i]
+                this.z_list.splice(ith,1)
+            }
+            for ( let descriptor of descriptors ) {
+                this.z_list.push(descriptor)
+            }
+            super.select(selects.length - 1)
+        } else {
+            let i = pars.select
+            if ( i === false ) {
+                i = this.selected
+            }
+            super.select(i)
+            this.selected_to_top()
         }
-        super.select(i)
-        this.selected_to_top()
         this.clear()
-        this.redraw()
+        this.redraw()    
     }
 
     update(pars) {
@@ -1586,6 +1645,29 @@ export class DrawTools extends ZList {
             this._unscale()
         }
     }
+    
+    
+    bounding_group(pars) {
+        if ( !pars ) return
+        let selections = pars.selections
+        //
+        if ( selections && Array.isArray(selections) ) {
+            let group_objects = selections.map((ith) => {
+                return this.ith_object(ith)
+            })
+            group_objects = group_objects.filter((obj) => {
+                return obj !== false
+            })
+            let group_boxes = group_objects.map(obj => {
+                return obj.bounds
+            })
+            let bound_box = max_box(group_boxes)
+            pars.points = bound_box
+            this.group(pars)
+        }
+        //
+    }
+
 
     search_selection_toggle(pars) {
         if ( !pars ) return
