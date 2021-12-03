@@ -11,6 +11,10 @@
 const sec = (n) => 1 / Math.cos(n);
 
 
+const MIN_W_BOUNDING_BOX = 2
+const MIN_H_BOUNDING_BOX = 2
+
+
 const _rects_intersect = (rect1,rect2) => {
     let [x1,y1,w1,h1] = rect1
     let [x2,y2,w2,h2] = rect2
@@ -154,11 +158,31 @@ const _neg_p = (point) => {
 }
 
 
-const _line_bounds = (x1,y1,x2,y2) => {
+const _points_from_bounds = (bounds) => {
+    let [x,y,w,h] = bounds
+    return [x,y,x+w,y+h]
+}
+
+const _line_points = (x1,y1,x2,y2) => {
     let left = Math.min(x1,x2)
     let right = Math.max(x1,x2)
     let top = Math.min(y1,y2)
     let bottom = Math.max(y1,y2)
+    return [left,top,right, bottom]
+}
+
+const _line_bounds = (x1,y1,x2,y2) => {
+    let [left,top,right, bottom] = _line_points(x1,y1,x2,y2)
+    let w = (right - left)
+    let h = (bottom - top)
+    if ( w < MIN_W_BOUNDING_BOX ) {
+        w += MIN_W_BOUNDING_BOX
+        left -= MIN_W_BOUNDING_BOX
+    }
+    if ( h < MIN_H_BOUNDING_BOX ) {
+        h += MIN_H_BOUNDING_BOX
+        top -= MIN_H_BOUNDING_BOX
+    }
     return [left,top,(right - left),(bottom - top)]
 }
 
@@ -266,18 +290,58 @@ const _ellipse_path = (descriptor,centerX,centerY,rad1,rad2,rotate) => {
 
 const _line_path = (descriptor,x1,y1,x2,y2) => {
     const line_P = new Path2D();
-    line_P.moveTo(x1,y1+5)
-    line_P.lineTo(x1,y1-5)
-    line_P.lineTo(x2,y2-5)
-    line_P.lineTo(x2,y2+5)
-    line_P.lineTo(x1,y1+5)
-    line_P.closePath()
+    if ( ( Math.abs(x2 - x1) < 5 ) || ( Math.abs(y2 - y1) < 5 ) ) {
+        let [px1,py1,px2,py2] = _line_points(x1,y1,x2,y2)
+        line_P.moveTo(px1-5,py1-5)
+        line_P.lineTo(px2+5,py1-5)
+        line_P.lineTo(px2+5,py2+5)
+        line_P.lineTo(px1-5,py2+5)
+        line_P.lineTo(px1-5,py1-5)
+        line_P.closePath()
+    } else {
+        let m = (y2 - y1)/(x2 - x1)   // slope
+        // will take line to the endpoints of the segment, but could extend then using the normalized vector in the direction of the segment
+        let e1_x = x1, e1_y = y1, e2_x = x2, e2_y = y2  // enpoints after extension
+        let p1_x = 0, p1_y = 0, p2_x = 0, p2_y = 0, p3_x = 0, p3_y = 0, p4_x = 0, p4_y = 0
+        let R = 5  /// the distance points away from the line 
+        let x, y     // points on the circle intersecting the perpendicular to the zero centered segment
+        //
+        let b = (1.0 + 1.0/(m*m))
+        x = Math.sqrt(R*(R/b))
+        y = -(1/m)*x
+        let x_neg = -x
+        let y_neg = -y
+        //
+        p1_x = x + e1_x
+        p1_y = y + e1_y
+        p2_x = x + e2_x
+        p2_y = y + e2_y
+        p3_x = x_neg + x2
+        p3_y = y_neg + y2
+        p4_x = x_neg + x1
+        p4_y = y_neg + y1
+        //
+        line_P.moveTo(p1_x,p1_y)
+        line_P.lineTo(p2_x,p2_y)
+        line_P.lineTo(p3_x,p3_y)
+        line_P.lineTo(p4_x,p4_y)
+        line_P.lineTo(p1_x,p1_y)
+        //
+        line_P.closePath()
+    }
     descriptor.path = line_P
 }
 
 
 const _line_path_r = (descriptor,x1,y1,x2,y2,rotate) => {
-    let points = [[x1,y1-5],[x2,y2-5],[x2,y2+5],[x1,y1+5]]
+    
+    let points = false
+    if ( Math.abs(px2 - px1) < 3 ) {
+        let [px1,py1,px2,py2] = _line_points(x1,y1,x2,y2)
+        points = [[px1-5,py1-5],[px2+5,py1-5],[px2+5,py2+5],[px1,py2+5]]
+    } else {
+        points = [[x1,y1-5],[x2,y2-5],[x2,y2+5],[x1,y1+5]]
+    }
     _line_path_bounds(descriptor,points,rotate,true)
 }
 
@@ -742,6 +806,11 @@ export class DrawTools extends ZList {
         if ( this._redraw_descriptor ) return this._redraw_descriptor
         else {
             let descriptor = { "shape" : shape, "pars" : pars, "bounds" : [] }
+            //
+            if ( pars.role ) {      // a lifted parameter -- may generalize to others.
+                descriptor.role = pars.role
+            }
+            
             this.push(descriptor)
             return descriptor    
         }
@@ -890,10 +959,10 @@ export class DrawTools extends ZList {
                     ctxt.lineTo((x2-c_x),(y2-c_y))
                     ctxt.stroke()
                     this.unrotate(c_x,c_y,pars.rotate)
+                    descriptor.bounds = _line_bounds(x1,y1,x2,y2)
                     _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate)  // path only
                 } else {
                     descriptor.bounds = _line_bounds(x1,y1,x2,y2)
-                    //
                     _line_path(descriptor,x1,y1,x2,y2)      // path_only
                     ctxt.beginPath();
                     ctxt.lineWidth = pars.thick;
@@ -1339,9 +1408,6 @@ export class DrawTools extends ZList {
         if ( !pars ) return
         if ( Array.isArray(pars.select) ) {
             let selects = [].concat(pars.select)
-            let top_i = this.z_list.length - 1
-            let i = selects.indexOf(top_i)
-            selects.splice(i,1)
             selects.sort()
             selects.reverse()
             let descriptors = selects.map(ith => { return this.z_list[ith]} )
@@ -1352,8 +1418,8 @@ export class DrawTools extends ZList {
             for ( let descriptor of descriptors ) {
                 this.z_list.unshift(descriptor)  // push onto the front
             }
-            super.select(selects.length - 1)
-        } else {
+            this.select_top()
+       } else {
             let i = pars.select
             if ( i === false ) {
                 i = this.selected
@@ -1380,7 +1446,7 @@ export class DrawTools extends ZList {
             for ( let descriptor of descriptors ) {
                 this.z_list.push(descriptor)
             }
-            super.select(selects.length - 1)
+            this.select_top()
         } else {
             let i = pars.select
             if ( i === false ) {
@@ -1616,10 +1682,6 @@ export class DrawTools extends ZList {
                 let sel_list = this._all_bounds_intersect(descriptor.bounds)
                 descriptor.select_list = sel_list
                 descriptor.do_draw_selections = true
-            }
-            // pars.role
-            if ( pars.role ) {
-                descriptor.role = pars.role
             }
 
             let all_i = descriptor.select_list
