@@ -796,6 +796,11 @@ export class DrawTools extends ZList {
         if ( pars.line !== "none" ) {
             ctxt.lineWidth = pars.thick;
             ctxt.strokeStyle = pars.line;
+            if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                ctxt.setLineDash(pars.line_dash);
+            } else {
+                ctxt.setLineDash([]);
+            }
             if ( path ) ctxt.stroke(path);
             else ctxt.stroke();
         }
@@ -911,6 +916,11 @@ export class DrawTools extends ZList {
                 if ( pars.line && (pars.line !== "none") ) {
                     ctxt.lineWidth = pars.thick;
                     ctxt.strokeStyle = pars.line;
+                    if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                        ctxt.setLineDash(pars.line_dash);
+                    } else {
+                        ctxt.setLineDash([]);
+                    }
                     ctxt.strokeRect((x1 - c_x),(y1 - c_y),w,h)
                 }
                 if ( pars.fill && (pars.fill !== "none") ) {
@@ -923,6 +933,11 @@ export class DrawTools extends ZList {
                 if ( pars.line && (pars.line !== "none") ) {
                     ctxt.lineWidth = pars.thick;
                     ctxt.strokeStyle = pars.line;
+                    if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                        ctxt.setLineDash(pars.line_dash);
+                    } else {
+                        ctxt.setLineDash([]);
+                    }
                     ctxt.strokeRect(x1,y1,w,h)
                 }
                 if ( pars.fill && (pars.fill !== "none") ) {
@@ -955,6 +970,11 @@ export class DrawTools extends ZList {
                     ctxt.beginPath();
                     ctxt.lineWidth = pars.thick;
                     ctxt.strokeStyle = pars.line;
+                    if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                        ctxt.setLineDash(pars.line_dash);
+                    } else {
+                        ctxt.setLineDash([]);
+                    }
                     ctxt.moveTo((x1-c_x),(y1-c_y))
                     ctxt.lineTo((x2-c_x),(y2-c_y))
                     ctxt.stroke()
@@ -967,6 +987,11 @@ export class DrawTools extends ZList {
                     ctxt.beginPath();
                     ctxt.lineWidth = pars.thick;
                     ctxt.strokeStyle = pars.line;
+                    if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                        ctxt.setLineDash(pars.line_dash);
+                    } else {
+                        ctxt.setLineDash([]);
+                    }
                     ctxt.moveTo(x1,y1)
                     ctxt.lineTo(x2,y2)
                     ctxt.stroke()
@@ -993,6 +1018,11 @@ export class DrawTools extends ZList {
             //
             ctxt.lineWidth = pars.thick;
             ctxt.strokeStyle = pars.line;
+            if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                ctxt.setLineDash(pars.line_dash);
+            } else {
+                ctxt.setLineDash([]);
+            }
             //
             let curve = new Path2D();
             if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
@@ -1035,6 +1065,11 @@ export class DrawTools extends ZList {
             //
             ctxt.lineWidth = pars.thick;
             ctxt.strokeStyle = pars.line;
+            if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                ctxt.setLineDash(pars.line_dash);
+            } else {
+                ctxt.setLineDash([]);
+            }
             //
             let curve = new Path2D();
             if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
@@ -1080,6 +1115,11 @@ export class DrawTools extends ZList {
             //
             ctxt.lineWidth = pars.thick;
             ctxt.strokeStyle = pars.line;
+            if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                ctxt.setLineDash(pars.line_dash);
+            } else {
+                ctxt.setLineDash([]);
+            }
             ctxt.font = pars.font;
             ctxt.textAlign = pars.textAlign;
             ctxt.textBaseline = pars.textBaseline;
