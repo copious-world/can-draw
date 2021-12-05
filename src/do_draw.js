@@ -547,6 +547,7 @@ function grid_on_canvas(ctx,width,height,x_mag,y_mag,ruler_interval) {
     ctx.lineWidth = 1
     ctx.fillStyle = '#000';
     ctx.strokeStyle = '#000000';
+    ctx.setLineDash([]);
     ctx.beginPath();
     draw_tick_delta(ctx,width,height,20*x_tick_delta,20*y_tick_delta)
     ctx.stroke();
@@ -564,9 +565,12 @@ function grid_on_canvas(ctx,width,height,x_mag,y_mag,ruler_interval) {
 const test_draw_path = (ctxt,descriptor) => {
     let path = descriptor.path
     if ( path ) {
+        ctxt.save()
         ctxt.lineWidth = 2
         ctxt.strokeStyle = 'magenta'
+        ctxt.setLineDash([1,1,2,1]);
         ctxt.stroke(path);
+        ctxt.restore()
     }
 }
 
