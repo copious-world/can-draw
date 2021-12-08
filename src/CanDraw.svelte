@@ -13,12 +13,16 @@
 
     export let selected = false
     export let mouse_to_shape = false
+    export let secondary_shape = false
 
     export let multi_select = false
+    export let z_list = false
 
     export let canvas_mouse = { x: 0, y: 0 }
 
     export let canvas_changed = false
+
+    export let internal_draw = false
 
 
     let old_canvas_left = doc_left
@@ -32,6 +36,7 @@
     $: if ( the_canvas && !drawit ) {
         ctxt = the_canvas.getContext("2d");
         drawit = new DrawTools(ctxt,width,height)
+        internal_draw = drawit
     }
 
     g_commander.subscribe((command) => {
@@ -51,9 +56,15 @@
         } else if ( command.update !== undefined ) {
             drawit.update(pars)
         } else if ( command.searching !== undefined ) {
-            mouse_to_shape = drawit.mouse_in_shape(pars)
+            if ( pars.no_change ) {
+                secondary_shape = drawit.mouse_in_shape(pars)
+            } else {
+                mouse_to_shape = drawit.mouse_in_shape(pars)
+            }
         } else if ( command.multi_select !== undefined ) {
             multi_select = drawit.all_bounds_intersect(pars)
+        } else if ( command.z_list !== undefined ) {
+            z_list = drawit.z_list_deep_clone()
         }
         //
         selected = drawit.selected_object()

@@ -672,6 +672,18 @@ class ZList {
         this.z_list = z_replacement
         this.selected = -1
     }
+
+    // ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+
+    get_by_id_and_role(id,role) {
+        for ( let obj of this.z_list ) {
+            if ( (obj.id === id) && (obj.role === role) ) {
+                return obj
+            }
+        }
+        return false
+    }
+
 }
 
 export class DrawTools extends ZList {
@@ -818,6 +830,9 @@ export class DrawTools extends ZList {
             //
             if ( pars.role ) {      // a lifted parameter -- may generalize to others.
                 descriptor.role = pars.role
+            }
+            if ( pars.id ) {      // a lifted parameter -- may generalize to others.
+                descriptor.id = pars.id
             }
             
             this.push(descriptor)
@@ -1514,14 +1529,39 @@ export class DrawTools extends ZList {
         }
     }
 
+
+    update_by_id(pars) {
+        let id = pars.id
+        let role = pars.role
+        if ( id && role ) {
+            this.redrawing = true
+            let selected = this.get_by_id_and_role(id,role)
+            if ( selected ) {
+                selected.pars = pars
+            }
+            this.redrawing = false
+        }
+    }
+
+
+    refresh(pars) {
+        this.redrawing = true
+        this.clear()
+        this.redraw()
+        this.redrawing = false
+    }
+
+
     mouse_in_shape(pars) {
         if ( !pars ) return
         if ( this.ctxt ) {
+            let exclusion = pars.exclude ? pars.exclude : false
             let ctxt = this.ctxt
             let [x,y] = pars.mouse_loc
             this.redrawing = true
             let i = this.z_list.length
             while ( (--i) >= 0 ) {
+                if ( exclusion === i ) continue
                 let path = this.z_list[i].path
                 if ( path ) {
                     if ( ctxt.isPointInPath(path, x, y) ) {
