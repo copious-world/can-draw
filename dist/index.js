@@ -413,6 +413,45 @@
      */
     const sec = (n) => 1 / Math.cos(n);
 
+
+    const MIN_W_BOUNDING_BOX = 2;
+    const MIN_H_BOUNDING_BOX = 2;
+
+
+    const _rects_intersect = (rect1,rect2) => {
+        let [x1,y1,w1,h1] = rect1;
+        let [x2,y2,w2,h2] = rect2;
+
+        let r1 = x1 + w1;
+        let r2 = x2 + w2;
+        let b1 = y1 + h1;
+        let b2 = y2 + h2;
+
+        if ( w1 <= 0 || h1 <= 0 || w2 <= 0 || h2 <= 0 ) { return false }    
+        if ( r1 <= x2 || r2 <= x1  ) return false;
+        if ( b1 <= y2 || b2 <= y1  ) return false;
+        return true;
+    };
+
+    const max_box = (group_boxes) => {
+        let min_x = 2000;
+        let min_y = 2000;
+        let max_x = 0;
+        let max_y = 0;
+        for ( let box of group_boxes ) {
+            let [x,y,w,h] = box;
+            if ( x < min_x ) min_x = x;
+            if ( y < min_y ) min_y = y;
+            x += w;
+            y += h;
+            if ( x > max_x ) max_x = x;
+            if ( y > max_y ) max_y = y;
+        }
+        let w_hat = max_x - min_x;
+        let h_hat = max_y - min_y;
+        return [min_x,min_y,w_hat,h_hat]
+    };
+
     const circle_bounding_rect = (centerX, centerY, radius) => {
         let left = centerX  - radius;
         let top = centerY - radius;
@@ -421,12 +460,27 @@
         return [left,top,width,height]
     };
 
-    const ellipse_bounding_rect = (centerX, centerY, rad1, rad2) => {
-        let left = centerX  - rad1;
-        let top = centerY - rad2;
-        let width = 2*rad1;
-        let height = 2*rad2;
-        return [left,top,width,height]
+    const ellipse_bounding_rect = (centerX, centerY, rad1, rad2,rotate) => {
+        if ( rotate === 0.0 )  {
+            let left = centerX  - rad1;
+            let top = centerY - rad2;
+            let width = 2*rad1;
+            let height = 2*rad2;
+            return [left,top,width,height]    
+        } else {
+            let cs = Math.cos(rotate);
+            let sn = Math.sin(rotate);
+            //
+            let cs_sqr = cs*cs;
+            let sn_sqr = sn*sn;
+            let r1_sqr = rad1*rad1;
+            let r2_sqr = rad2*rad2;
+            //
+            let lim_x = Math.sqrt(r1_sqr*cs_sqr + r2_sqr*sn_sqr);
+            let lim_y = Math.sqrt(r1_sqr*sn_sqr + r2_sqr*cs_sqr);
+            let bbox = [centerX - lim_x,centerY - lim_y,2*lim_x,2*lim_y];
+            return bbox
+        }
     };
 
 
@@ -439,25 +493,6 @@
         return [w,h,top]
     };
 
-    const update_bounds = (descriptor,x_up,y_up) => {
-        if ( descriptor ) {
-            let [x,y,w,h] = descriptor.bounds;
-            if ( x_up < x ) {
-                w += x - x_up;
-                x = x_up;
-            } else if ( x_up > (x + w) ) {
-                w = x_up - x;
-            }
-            if ( y_up < y ) {
-                h += y - y_up;
-                y = y_up;
-            } else if ( y_up > (y + h) ) {
-                h = y_up - y;
-            }
-            descriptor.bounds = [x,y,w,h];
-        }
-    };
-
 
     const _rect_path = (descriptor,x1,y1,w,h) => {
         const rect_P = new Path2D();
@@ -465,6 +500,21 @@
         descriptor.path = rect_P;    
     };
 
+
+    const x_of_pairs  = (points) => {
+        let xs = points.map(pair => {
+            return pair[0]
+        });
+        return xs
+    };
+
+
+    const y_of_pairs = (points) => {
+        let ys = points.map(pair => {
+            return pair[1]
+        });
+        return ys
+    };
 
 
 
@@ -510,6 +560,29 @@
         point[1] = -point[1];
     };
 
+    const _line_points = (x1,y1,x2,y2) => {
+        let left = Math.min(x1,x2);
+        let right = Math.max(x1,x2);
+        let top = Math.min(y1,y2);
+        let bottom = Math.max(y1,y2);
+        return [left,top,right, bottom]
+    };
+
+    const _line_bounds = (x1,y1,x2,y2) => {
+        let [left,top,right, bottom] = _line_points(x1,y1,x2,y2);
+        let w = (right - left);
+        let h = (bottom - top);
+        if ( w < MIN_W_BOUNDING_BOX ) {
+            w += MIN_W_BOUNDING_BOX;
+            left -= MIN_W_BOUNDING_BOX;
+        }
+        if ( h < MIN_H_BOUNDING_BOX ) {
+            h += MIN_H_BOUNDING_BOX;
+            top -= MIN_H_BOUNDING_BOX;
+        }
+        return [left,top,(right - left),(bottom - top)]
+    };
+
     const _rect_path_bounds = (descriptor,x1,y1,x2,y2,rotate) => {
         let r00 = Math.cos(rotate);
         let r01 = -Math.sin(rotate);
@@ -546,10 +619,16 @@
         rect_lines_P.closePath();
         descriptor.path = rect_lines_P;
 
-        //descriptor.bounds_t = [[x11_r,y11_r],[x12_r,y12_r],[x22_r,y22_r],[x21_r,y21_r]]
+        let min_top = Math.min(y11_r,y22_r,y12_r,y21_r);
+        let min_left = Math.min(x11_r,x22_r,x12_r,x21_r);
+        let max_bottom = Math.max(y11_r,y22_r,y12_r,y21_r);
+        let max_right = Math.max(x11_r,x22_r,x12_r,x21_r);
+
+        descriptor.bounds = [min_top,min_left,max_right - min_top,max_bottom - min_top];
+        descriptor.final_path = [[x11_r,y11_r],[x12_r,y12_r],[x22_r,y22_r],[x21_r,y21_r]];
     };
 
-    const _line_path_bounds = (descriptor,points,rotate) => {
+    const _line_path_bounds = (descriptor,points,rotate,store_rotation) => {
         let points_hat = [].concat(points);
         if ( (rotate !== undefined) && !isNaN(rotate) ) {
             let c_o_m = _center_of_mass(points_hat);
@@ -558,6 +637,18 @@
             _rotate_points(rotate,points_hat);
             _neg_p(c_o_m);
             _translate_points(c_o_m,points_hat);
+        }
+
+        let xs = x_of_pairs(points_hat);
+        let ys = y_of_pairs(points_hat);
+        let min_left = Math.min(...xs);
+        let min_top = Math.min(...ys);
+        let max_right = Math.max(...xs);
+        let max_bottom = Math.max(...ys);
+
+        descriptor.bounds = [min_left,min_top,max_right - min_left,max_bottom - min_top];
+        if ( store_rotation ) {
+            descriptor.final_path = [].concat(points_hat);
         }
 
         let p0 = points_hat.shift();
@@ -574,6 +665,7 @@
         }
         lines_P.closePath();
         descriptor.path = lines_P;
+
         return lines_P
     };
 
@@ -595,25 +687,65 @@
 
     const _line_path = (descriptor,x1,y1,x2,y2) => {
         const line_P = new Path2D();
-        line_P.moveTo(x1,y1+5);
-        line_P.lineTo(x1,y1-5);
-        line_P.lineTo(x2,y2-5);
-        line_P.lineTo(x2,y2+5);
-        line_P.lineTo(x1,y1+5);
-        line_P.closePath();
+        if ( ( Math.abs(x2 - x1) < 5 ) || ( Math.abs(y2 - y1) < 5 ) ) {
+            let [px1,py1,px2,py2] = _line_points(x1,y1,x2,y2);
+            line_P.moveTo(px1-5,py1-5);
+            line_P.lineTo(px2+5,py1-5);
+            line_P.lineTo(px2+5,py2+5);
+            line_P.lineTo(px1-5,py2+5);
+            line_P.lineTo(px1-5,py1-5);
+            line_P.closePath();
+        } else {
+            let m = (y2 - y1)/(x2 - x1);   // slope
+            // will take line to the endpoints of the segment, but could extend then using the normalized vector in the direction of the segment
+            let e1_x = x1, e1_y = y1, e2_x = x2, e2_y = y2;  // enpoints after extension
+            let p1_x = 0, p1_y = 0, p2_x = 0, p2_y = 0, p3_x = 0, p3_y = 0, p4_x = 0, p4_y = 0;
+            let R = 5;  /// the distance points away from the line 
+            let x, y;     // points on the circle intersecting the perpendicular to the zero centered segment
+            //
+            let b = (1.0 + 1.0/(m*m));
+            x = Math.sqrt(R*(R/b));
+            y = -(1/m)*x;
+            let x_neg = -x;
+            let y_neg = -y;
+            //
+            p1_x = x + e1_x;
+            p1_y = y + e1_y;
+            p2_x = x + e2_x;
+            p2_y = y + e2_y;
+            p3_x = x_neg + x2;
+            p3_y = y_neg + y2;
+            p4_x = x_neg + x1;
+            p4_y = y_neg + y1;
+            //
+            line_P.moveTo(p1_x,p1_y);
+            line_P.lineTo(p2_x,p2_y);
+            line_P.lineTo(p3_x,p3_y);
+            line_P.lineTo(p4_x,p4_y);
+            line_P.lineTo(p1_x,p1_y);
+            //
+            line_P.closePath();
+        }
         descriptor.path = line_P;
     };
 
 
     const _line_path_r = (descriptor,x1,y1,x2,y2,rotate) => {
-        let points = [[x1,y1-5],[x2,y2-5],[x2,y2+5],[x1,y1+5]];
-        _line_path_bounds(descriptor,points,rotate);
+        
+        let points = false;
+        if ( Math.abs(px2 - px1) < 3 ) {
+            let [px1,py1,px2,py2] = _line_points(x1,y1,x2,y2);
+            points = [[px1-5,py1-5],[px2+5,py1-5],[px2+5,py2+5],[px1,py2+5]];
+        } else {
+            points = [[x1,y1-5],[x2,y2-5],[x2,y2+5],[x1,y1+5]];
+        }
+        _line_path_bounds(descriptor,points,rotate,true);
     };
 
 
     const _text_path = (descriptor) => {
         let [x,y,w,h] = descriptor.bounds;
-        _rect_path(descriptor,x,y,w,h);
+        _rect_path(descriptor,x,y,w,h);  // put a path on the descriptor
     };
 
 
@@ -812,6 +944,7 @@
         ctx.lineWidth = 1;
         ctx.fillStyle = '#000';
         ctx.strokeStyle = '#000000';
+        ctx.setLineDash([]);
         ctx.beginPath();
         draw_tick_delta(ctx,width,height,20*x_tick_delta,20*y_tick_delta);
         ctx.stroke();
@@ -826,13 +959,26 @@
     }
 
 
+    const test_draw_path = (ctxt,descriptor) => {
+        let path = descriptor.path;
+        if ( path ) {
+            ctxt.save();
+            ctxt.lineWidth = 2;
+            ctxt.strokeStyle = 'magenta';
+            ctxt.setLineDash([1,1,2,1]);
+            ctxt.stroke(path);
+            ctxt.restore();
+        }
+    };
+
+
     class ZList {
 
         // 
         constructor() {
             this.z_list = [];
             this.redrawing = false;
-            this.selected = 0;
+            this.selected = -1;
             this._selected_object = false;
             this._redraw_descriptor = false;
         }
@@ -843,10 +989,21 @@
             }
         }
 
+        deselect() {
+            this.selected = -1;
+        }
+
         selected_object() {
             if ( (this.selected >= 0) && (this.selected < this.z_list.length) ) {
                 this._selected_object = this.z_list[this.selected];
                 return this._selected_object
+            }
+            return false
+        }
+
+        ith_object(ith) {
+            if ( (ith >= 0) && (ith < this.z_list.length) ) {
+                return(this.z_list[ith])
             }
             return false
         }
@@ -877,7 +1034,9 @@
         }
 
         pop() {
-            this.z_list.pop();
+            if ( (this.selected >= 0) && (this.selected < this.z_list.length )) {
+                this.z_list.pop();
+            }
         }
 
         reverse() {
@@ -892,6 +1051,36 @@
         z_top() {
             return (this.z_list.length - 1)
         }
+
+        z_top_object() {
+            let n = (this.z_list.length - 1);
+            if ( n >= 0 ) {
+                return this.z_list[n]
+            }
+            return false
+        }
+
+        z_list_deep_clone() {
+            let zclone = JSON.parse(JSON.stringify(this.z_list));
+            return zclone
+        }
+
+        z_list_replace(z_replacement) {
+            this.z_list = z_replacement;
+            this.selected = -1;
+        }
+
+        // ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+
+        get_by_id_and_role(id,role) {
+            for ( let obj of this.z_list ) {
+                if ( (obj.id === id) && (obj.role === role) ) {
+                    return obj
+                }
+            }
+            return false
+        }
+
     }
 
     class DrawTools extends ZList {
@@ -927,9 +1116,13 @@
 
         clear() {
             if ( this.ctxt ) {
-                this._scale();
-                this.ctxt.clearRect(0,0,this.width,this.height);
-                this._unscale();
+                if ( ( this.scale_x < 1.0 ) || ( this.scale_y < 1.0 ) ) {
+                    this.ctxt.clearRect(0,0,(this.width/this.scale_x),(this.height/this.scale_y));
+                } else {
+                    if ( this.scale_y > 1.0 ) this._scale();
+                    this.ctxt.clearRect(0,0,this.width,this.height);
+                    if ( this.scale_y > 1.0 )this._unscale();    
+                }
             }
         }
 
@@ -1016,6 +1209,11 @@
             if ( pars.line !== "none" ) {
                 ctxt.lineWidth = pars.thick;
                 ctxt.strokeStyle = pars.line;
+                if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                    ctxt.setLineDash(pars.line_dash);
+                } else {
+                    ctxt.setLineDash([]);
+                }
                 if ( path ) ctxt.stroke(path);
                 else ctxt.stroke();
             }
@@ -1026,12 +1224,20 @@
             if ( this._redraw_descriptor ) return this._redraw_descriptor
             else {
                 let descriptor = { "shape" : shape, "pars" : pars, "bounds" : [] };
+                //
+                if ( pars.role ) {      // a lifted parameter -- may generalize to others.
+                    descriptor.role = pars.role;
+                }
+                if ( pars.id ) {      // a lifted parameter -- may generalize to others.
+                    descriptor.id = pars.id;
+                }
+                
                 this.push(descriptor);
                 return descriptor    
             }
         }
 
-        text_rect(text,x,y,pars) {
+        text_rect(text,x,y,pars,descriptor) {
             let ctxt = this.ctxt;
             if ( ctxt ) {
                 let [w,h,top] = text_box(ctxt,text);
@@ -1118,7 +1324,7 @@
                 let ctxt = this.ctxt;
                 let [x1,y1,w,h] = pars.points;
                 //
-                if ( pars.rotate ) {
+                if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                     let c_x = (x1 + w/2);
                     let c_y = (y1 + h/2);
                     _rect_path_bounds(descriptor,x1,y1,(x1 + w),(y1 + h),pars.rotate);
@@ -1126,6 +1332,11 @@
                     if ( pars.line && (pars.line !== "none") ) {
                         ctxt.lineWidth = pars.thick;
                         ctxt.strokeStyle = pars.line;
+                        if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                            ctxt.setLineDash(pars.line_dash);
+                        } else {
+                            ctxt.setLineDash([]);
+                        }
                         ctxt.strokeRect((x1 - c_x),(y1 - c_y),w,h);
                     }
                     if ( pars.fill && (pars.fill !== "none") ) {
@@ -1138,6 +1349,11 @@
                     if ( pars.line && (pars.line !== "none") ) {
                         ctxt.lineWidth = pars.thick;
                         ctxt.strokeStyle = pars.line;
+                        if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                            ctxt.setLineDash(pars.line_dash);
+                        } else {
+                            ctxt.setLineDash([]);
+                        }
                         ctxt.strokeRect(x1,y1,w,h);
                     }
                     if ( pars.fill && (pars.fill !== "none") ) {
@@ -1153,7 +1369,6 @@
             }
         }
 
-
         //
         line(pars) {
             if ( !pars ) return
@@ -1164,25 +1379,35 @@
                 //
                 if ( pars.line !== "none" ) {
                     this._scale();
-                    if ( pars.rotate ) {
+                    if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                         let c_x = (x1 + x2)/2;
                         let c_y = (y1 + y2)/2;
                         this.rotate(c_x,c_y,pars.rotate);
                         ctxt.beginPath();
                         ctxt.lineWidth = pars.thick;
                         ctxt.strokeStyle = pars.line;
+                        if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                            ctxt.setLineDash(pars.line_dash);
+                        } else {
+                            ctxt.setLineDash([]);
+                        }
                         ctxt.moveTo((x1-c_x),(y1-c_y));
                         ctxt.lineTo((x2-c_x),(y2-c_y));
                         ctxt.stroke();
                         this.unrotate(c_x,c_y,pars.rotate);
-                        _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate);
+                        descriptor.bounds = _line_bounds(x1,y1,x2,y2);
+                        _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate);  // path only
                     } else {
-                        descriptor.bounds = [x1,y1,(x2 - x1),(y2 - y1)];
-                        //
-                        _line_path(descriptor,x1,y1,x2,y2);
+                        descriptor.bounds = _line_bounds(x1,y1,x2,y2);
+                        _line_path(descriptor,x1,y1,x2,y2);      // path_only
                         ctxt.beginPath();
                         ctxt.lineWidth = pars.thick;
                         ctxt.strokeStyle = pars.line;
+                        if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                            ctxt.setLineDash(pars.line_dash);
+                        } else {
+                            ctxt.setLineDash([]);
+                        }
                         ctxt.moveTo(x1,y1);
                         ctxt.lineTo(x2,y2);
                         ctxt.stroke();
@@ -1209,9 +1434,14 @@
                 //
                 ctxt.lineWidth = pars.thick;
                 ctxt.strokeStyle = pars.line;
+                if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                    ctxt.setLineDash(pars.line_dash);
+                } else {
+                    ctxt.setLineDash([]);
+                }
                 //
                 let curve = new Path2D();
-                if ( pars.rotate ) {
+                if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                     let c_x = (x1 + x2)/2;
                     let c_y = (y1 + y2)/2;
                     curve.moveTo(x1 - c_x,y1 - c_y);
@@ -1222,12 +1452,14 @@
                     ctxt.stroke(curve);
                     this.unrotate(c_x,c_y,pars.rotate);
                     descriptor.path = _bezier_bounds_rotate(x1, y1, cp1_x, cp1_y, cp2_x, cp2_y, x2, y2, pars.rotate);
+                    _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate);
                 } else {
                     curve.moveTo(x1,y1);
                     curve.bezierCurveTo(cp1_x, cp1_y, cp2_x, cp2_y, x2, y2);
                     ctxt.beginPath();
                     ctxt.stroke(curve);
                     descriptor.path = _bezier_bounds(x1,y1,cp1_x, cp1_y, cp2_x, cp2_y, x2, y2);
+                    _line_path(descriptor,x1,y1,x2,y2);
                 }
     // test_draw_path(ctxt,descriptor)
                 this._unscale();
@@ -1249,9 +1481,14 @@
                 //
                 ctxt.lineWidth = pars.thick;
                 ctxt.strokeStyle = pars.line;
+                if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                    ctxt.setLineDash(pars.line_dash);
+                } else {
+                    ctxt.setLineDash([]);
+                }
                 //
                 let curve = new Path2D();
-                if ( pars.rotate ) {
+                if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
                     let c_x = (x1 + x2)/2;
                     let c_y = (y1 + y2)/2;
                     curve.moveTo(x1 - c_x,y1 - c_y);
@@ -1263,6 +1500,7 @@
                     this.unrotate(c_x,c_y,pars.rotate);
                     //
                     descriptor.path = _quadratic_bounds_rotate(x1, y1, cp1_x, cp1_y, x2, y2, pars.rotate);
+                    _line_path_r(descriptor,x1,y1,x2,y2,pars.rotate);
                     //
                 } else {
                     curve.moveTo(x1,y1);
@@ -1270,6 +1508,7 @@
                     ctxt.beginPath();
                     ctxt.stroke(curve);
                     descriptor.path = _quadratic_bounds(x1, y1, cp1_x, cp1_y, x2, y2);
+                    _line_path(descriptor,x1,y1,x2,y2);
                 }
                 //
     // test_draw_path(ctxt,descriptor)
@@ -1292,13 +1531,18 @@
                 //
                 ctxt.lineWidth = pars.thick;
                 ctxt.strokeStyle = pars.line;
+                if ( pars.line_dash && Array.isArray(pars.line_dash) ) {
+                    ctxt.setLineDash(pars.line_dash);
+                } else {
+                    ctxt.setLineDash([]);
+                }
                 ctxt.font = pars.font;
                 ctxt.textAlign = pars.textAlign;
                 ctxt.textBaseline = pars.textBaseline;
                 //
-                if ( pars.rotate ) {
-                    descriptor.bounds = this.text_rect(text,x,y,pars);
-                    let [x1,y1,w,h] = descriptor.bounds;
+                if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
+                    descriptor.bounds = this.text_rect(text,x,y,pars,descriptor);
+                    let [x1,y1,w,h] = descriptor.bounds;  // get it up front to get a center
                     let c_x = x1 + w/2;
                     let c_y = y1 + h/2;
                     this.rotate(c_x,c_y,pars.rotate);
@@ -1315,8 +1559,8 @@
                     _rect_path_bounds(descriptor,x1,y1,x1 + w,y1 + h,pars.rotate);
                 } else {
                     ctxt.beginPath();
-                    descriptor.bounds = this.text_rect(text,x,y,pars);
-                    descriptor.bounds;
+                    descriptor.bounds = this.text_rect(text,x,y,pars,descriptor);
+                    //let [x1,y1,w,h] = descriptor.bounds
                     //
                     if ( pars.line && (pars.line !== "none") ) {
                         ctxt.strokeText(text, x, y);
@@ -1326,7 +1570,7 @@
                         ctxt.fillStyle = this.gradient ? this.gradient : pars.fill;
                         ctxt.fillText(text, x, y);
                     }
-                    _text_path(descriptor);
+                    _text_path(descriptor);  // put a path on the descriptor for selection
                 }
                 //
     // test_draw_path(ctxt,descriptor)
@@ -1373,14 +1617,14 @@
                 let descriptor = this._descriptor("ellipse",pars);
                 let ctxt = this.ctxt;
                 let [centerX, centerY, rad1, rad2] = pars.points;
-                let rotate = (pars.rotate !== undefined) ? pars.rotate : 0.0;
+                let rotate = ((pars.rotate !== undefined) && pars.rotate && (pars.rotate !== 0.0) ) ? pars.rotate : 0.0;
                 if ( rad1 <= 0 ) { this._unscale(); return }
                 if ( rad2 <= 0 ) { this._unscale(); return }
                 _ellipse_path(descriptor,centerX,centerY,rad1,rad2,rotate);
                 ctxt.beginPath();
                 ctxt.ellipse(centerX, centerY, rad1, rad2, rotate, 0, 2 * Math.PI);
                 this._lines_and_fill(ctxt,pars);
-                descriptor.bounds = ellipse_bounding_rect(centerX, centerY, rad1, rad2);
+                descriptor.bounds = ellipse_bounding_rect(centerX, centerY, rad1, rad2,rotate);
                 //
     // test_draw_path(ctxt,descriptor)
                 //
@@ -1389,8 +1633,36 @@
         }
 
 
+        //  path
+        path(pars) {
+            if ( !pars ) return
+            if ( this.ctxt ) {
+                this._scale();
+                let descriptor = this._descriptor("path",pars);
+                let ctxt = this.ctxt;
+                let points = pars.points;
+                descriptor.points = points;
 
-        //
+                let rotate = pars.rotate;
+                if ( (rotate !== undefined) && !isNaN(rotate) ) {
+                    let c_o_m = _center_of_mass(points);
+                    _neg_p(c_o_m);
+                    _translate_points(c_o_m,points);
+                    _rotate_points(rotate,points);
+                    _neg_p(c_o_m);
+                    _translate_points(c_o_m,points);
+                }
+
+                region = _line_path_bounds(descriptor,descriptor.points,false,true);
+
+                this._lines_and_fill(ctxt,pars,region);
+                descriptor.path = region;
+                this._unscale();
+            }
+        }
+
+
+        //  polygon
         polygon(pars) {
             if ( !pars ) return
             if ( this.ctxt ) {
@@ -1411,15 +1683,15 @@
                     let x = circumradius * Math.cos(angle) + cx;
                     let y = circumradius * Math.sin(angle) + cy;
                     //
-                    update_bounds(descriptor,x,y);
+                    //update_bounds(descriptor,x,y)
                     descriptor.points.push([x,y]);
                 }
 
                 let region = false;
-                if ( pars.rotate ) {
-                    region = _line_path_bounds(descriptor,descriptor.points,pars.rotate);
+                if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
+                    region = _line_path_bounds(descriptor,descriptor.points,pars.rotate,true);
                 } else {
-                    region = _line_path_bounds(descriptor,descriptor.points);
+                    region = _line_path_bounds(descriptor,descriptor.points,false,true);
                 }
 
                 ctxt.beginPath();
@@ -1431,7 +1703,30 @@
 
         }
 
-        //
+
+        change_star_radius(descriptor,ctrl_point,dx,dy,no_r_change) {
+            if ( descriptor === undefined || !(descriptor) ) return
+            let points = descriptor.pars.points;
+            //let final_path = descriptor.final_path
+            let cx = points[0];
+            let cy = points[1];
+            //
+            //let sample_point = final_path[0]
+            let outer_x = ctrl_point.x;
+            let outer_y = ctrl_point.y;
+            //
+            let t_x = (outer_x - cx);
+            let t_y = (outer_y - cy);//
+            //
+            let R = Math.sqrt(t_x*t_x + t_y*t_y);
+            if ( !no_r_change ) {
+                points[2] = R*1.5;
+            }
+            return points
+        }
+
+
+        //  star
         star(pars) {
             if ( !pars ) return
             if ( this.ctxt ) {
@@ -1482,20 +1777,42 @@
                 }
                 region.closePath();
 
-                if ( pars.rotate ) {
-                    region = _line_path_bounds(descriptor,descriptor.points,pars.rotate);
+                if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
+                    region = _line_path_bounds(descriptor,descriptor.points,pars.rotate,true);
                 } else {
-                    region = _line_path_bounds(descriptor,descriptor.points);
+                    region = _line_path_bounds(descriptor,descriptor.points,false,true);
                 }
 
                 this._lines_and_fill(ctxt,pars,region);
-            descriptor.path = region;
+                descriptor.path = region;
     // test_draw_path(ctxt,descriptor)
                 this._unscale();
             }
         }
 
 
+        //
+        bounding_path(pars) {
+            if ( !pars ) return
+            if ( this.ctxt ) {
+                this.clear();
+                this.redraw();
+                //
+                this.clear();
+                this.redraw();
+                //
+                let i = pars.index;
+                let state = pars.state;
+                if ( state ) {
+                    let descriptor = this.z_list[i];
+                    let ctxt = this.ctxt;
+                    this._scale();
+                    test_draw_path(ctxt,descriptor);
+                    this._unscale();
+                }
+                //
+            }
+        }
 
         //
         redraw() {
@@ -1537,15 +1854,35 @@
             super.select(i);
         }
 
+        deselect(pars) {
+            if ( !pars ) return
+            super.deselect();
+        }
+
         //
         send_bottom(pars) {
             if ( !pars ) return
-            let i = pars.select;
-            if ( i === false ) {
-                i = this.selected;
+            if ( Array.isArray(pars.select) ) {
+                let selects = [].concat(pars.select);
+                selects.sort();
+                selects.reverse();
+                let descriptors = selects.map(ith => { return this.z_list[ith]} );
+                for ( let i = 0; i < selects.length; i++ ) {
+                    let ith = selects[i];
+                    this.z_list.splice(ith,1);
+                }
+                for ( let descriptor of descriptors ) {
+                    this.z_list.unshift(descriptor);  // push onto the front
+                }
+                this.select_top();
+           } else {
+                let i = pars.select;
+                if ( i === false ) {
+                    i = this.selected;
+                }
+                super.select(i);
+                this.selected_to_bottom();    
             }
-            super.select(i);
-            this.selected_to_bottom();
             this.clear();
             this.redraw();
         }
@@ -1553,14 +1890,29 @@
         //
         send_top(pars) {
             if ( !pars ) return 
-            let i = pars.select;
-            if ( i === false ) {
-                i = this.selected;
+            if ( Array.isArray(pars.select) ) {
+                let selects = pars.select;
+                selects.sort();
+                let descriptors = selects.map(ith => { return this.z_list[ith]} );
+                selects.reverse();
+                for ( let i = 0; i < selects.length; i++ ) {
+                    let ith = selects[i];
+                    this.z_list.splice(ith,1);
+                }
+                for ( let descriptor of descriptors ) {
+                    this.z_list.push(descriptor);
+                }
+                this.select_top();
+            } else {
+                let i = pars.select;
+                if ( i === false ) {
+                    i = this.selected;
+                }
+                super.select(i);
+                this.selected_to_top();
             }
-            super.select(i);
-            this.selected_to_top();
             this.clear();
-            this.redraw();
+            this.redraw();    
         }
 
         update(pars) {
@@ -1574,17 +1926,43 @@
             }
         }
 
+
+        update_by_id(pars) {
+            let id = pars.id;
+            let role = pars.role;
+            if ( id && role ) {
+                this.redrawing = true;
+                let selected = this.get_by_id_and_role(id,role);
+                if ( selected ) {
+                    selected.pars = pars;
+                }
+                this.redrawing = false;
+            }
+        }
+
+
+        refresh(pars) {
+            this.redrawing = true;
+            this.clear();
+            this.redraw();
+            this.redrawing = false;
+        }
+
+
         mouse_in_shape(pars) {
             if ( !pars ) return
             if ( this.ctxt ) {
+                let exclusion = pars.exclude ? pars.exclude : false;
                 let ctxt = this.ctxt;
                 let [x,y] = pars.mouse_loc;
                 this.redrawing = true;
                 let i = this.z_list.length;
                 while ( (--i) >= 0 ) {
+                    if ( exclusion === i ) continue
                     let path = this.z_list[i].path;
                     if ( path ) {
                         if ( ctxt.isPointInPath(path, x, y) ) {
+                            this.redrawing = false;
                             return i
                         }
                     }
@@ -1593,6 +1971,70 @@
             }
             return false
         }
+
+        //
+        mouse_in_shapes_all(mouse_loc) {
+            if ( this.ctxt ) {
+                let ctxt = this.ctxt;
+                let [x,y] = mouse_loc;
+                let i = this.z_list.length;
+                let shape_finds = [];
+                while ( (--i) >= 0 ) {
+                    let path = this.z_list[i].path;
+                    if ( path ) {
+                        if ( ctxt.isPointInPath(path, x, y) ) {
+                            this.redrawing = false;
+                            shape_finds.push(i);
+                        }
+                    }
+                }
+                return shape_finds
+            }
+            return false
+        }
+
+        //
+        bounds_intersect(pars) {
+            if ( !pars ) return
+            let test_rect = pars.rect;
+            this.redrawing = true;
+            let i = this.z_list.length;
+            while ( (--i) >= 0 ) {
+                let descriptor = this.z_list[i];
+                if ( descriptor ) {
+                    if ( _rects_intersect(test_rect,descriptor.bounds) ) {
+                        this.redrawing = false;
+                        return i
+                    }
+                }
+            }
+            this.redrawing = false;
+        }
+
+
+        _all_bounds_intersect(test_rect) {
+            let i = this.z_list.length;
+            let sel_list = [];
+            while ( (--i) >= 0 ) {
+                let descriptor = this.z_list[i];
+                if ( descriptor ) {
+                    if ( _rects_intersect(test_rect,descriptor.bounds) ) {
+                        sel_list.push(i);
+                    }
+                }
+            }
+            return sel_list
+        }
+
+        all_bounds_intersect(pars) {
+            if ( !pars ) return
+            let test_rect = pars.rect;
+            this.redrawing = true;
+            let sel_list = this._all_bounds_intersect(test_rect);
+            this.redrawing = false;
+            return sel_list
+        }
+
 
         set_scale(pars) {
             if ( !pars ) return
@@ -1608,9 +2050,55 @@
         }
 
 
-        remove_seleted() {
-            this.selected_to_top();
-            this.pop();
+
+        is_group_selection() {
+            let descriptor = this.z_top_object();
+            if ( descriptor.shape === 'group' ) {
+                let children = descriptor.children;
+                if ( !children ) {
+                    if ( (descriptor.select_list !== undefined) && Array.isArray(descriptor.select_list) ) {
+                        //
+                        return (descriptor.select_list.length > 0) 
+                        //
+                    }
+                }
+            }
+        }
+
+        // 
+        remove_selected() {
+            if ( this.is_group_selection() ) {
+                let descriptor = this.z_top_object();
+                let del_list = descriptor.select_list;
+                del_list.sort();
+                del_list.reverse();
+                let exclusions = descriptor.exclusion_list;
+                if ( exclusions === undefined ) {
+                    exclusions = [];
+                    descriptor.exclusion_list = exclusions;
+                }
+        
+                for ( let ith of del_list ) {
+                    if ( exclusions.indexOf(ith) < 0 ) {
+                        super.select(ith);
+                        this.selected_to_top();
+                        this.pop();
+                    }
+                }
+                this.clear();
+                this.redraw();
+            } else {
+                this.selected_to_top();
+                this.pop();
+                this.clear();
+                this.redraw();    
+            }
+        }
+
+        z_list_replace(pars) {
+            if ( !pars ) return
+            let z_replacement = pars.z_list;
+            super.z_list_replace(z_replacement);
             this.clear();
             this.redraw();
         }
@@ -1636,6 +2124,161 @@
                 grid_on_canvas(ctxt,this.width,this.height,this.scale_x,this.scale_y,ruler_interval);
             }
         }
+
+
+
+
+        group(pars) {
+            if ( !pars ) return
+            if ( this.ctxt ) {
+                this._scale();
+                let descriptor = this._descriptor("group",pars);
+                let ctxt = this.ctxt;
+                let [x1,y1,w,h] = pars.points;
+                _rect_path(descriptor,x1,y1,w,h);
+                if ( pars.line && (pars.line !== "none") ) {
+                    ctxt.save();
+                    ctxt.lineWidth = pars.thick;
+                    ctxt.strokeStyle = pars.line;
+                    ctxt.setLineDash([5, 3]);
+                    ctxt.strokeRect(x1,y1,w,h);
+                    ctxt.restore();
+                }
+                if ( pars.fill && (pars.fill !== "none") ) {
+                    ctxt.fillStyle = this.gradient ? this.gradient : pars.fill;
+                    ctxt.fillRect(x1,y1,w,h);
+                }
+                descriptor.bounds = [x1,y1,w,h];
+
+                ctxt.save();
+                ctxt.lineWidth = 1;
+                ctxt.strokeStyle ='rgba(200,127,127,0.9)';
+                ctxt.font = "12px cursive";
+                ctxt.textAlign = "center";
+                ctxt.textBaseline = "middle";
+                ctxt.strokeText('G', x1, y1);
+                ctxt.restore();
+
+                if ( descriptor.do_drawing_state ) {
+                    let sel_list = this._all_bounds_intersect(descriptor.bounds);
+                    descriptor.select_list = sel_list;
+                    descriptor.do_draw_selections = true;
+                }
+
+                let all_i = descriptor.select_list;
+                let state = descriptor.do_draw_selections;
+                let exclusions = descriptor.exclusion_list;
+                if ( exclusions === undefined ) {
+                    exclusions = [];
+                    descriptor.exclusion_list = exclusions;
+                }
+
+                if ( state ) {
+                    let ctxt = this.ctxt;
+                    for ( let i of all_i ) {
+                        if ( i !== this.selected ) {
+                            if ( exclusions.indexOf(i) < 0 ) {
+                                let child_descriptor = this.z_list[i];
+                                test_draw_path(ctxt,child_descriptor);    
+                            }
+                        }
+                    }
+                }
+
+                this._unscale();
+            }
+        }
+        
+        
+        bounding_group(pars) {
+            if ( !pars ) return
+            let selections = pars.selections;
+            //
+            if ( selections && Array.isArray(selections) ) {
+                let group_objects = selections.map((ith) => {
+                    return this.ith_object(ith)
+                });
+                group_objects = group_objects.filter((obj) => {
+                    return obj !== false
+                });
+                let group_boxes = group_objects.map(obj => {
+                    return obj.bounds
+                });
+                let bound_box = max_box(group_boxes);
+                pars.points = bound_box;
+                this.group(pars);
+            }
+            //
+        }
+
+
+        search_selection_toggle(pars) {
+            if ( !pars ) return
+            let descriptor = this.z_top_object();
+            if ( descriptor.shape === 'group' ) {
+                let children = descriptor.children;
+                if ( !children ) {
+                    let mouse_loc = pars.mouse_loc;
+                    let found_shapes = this.mouse_in_shapes_all(mouse_loc);
+                    if ( !found_shapes ) return
+                    //
+                    let depth = pars.depth ? parseInt(pars.depth) : 1;
+
+                    found_shapes.sort();
+                    found_shapes.reverse();
+                    let exclusions = descriptor.exclusion_list;
+                    if ( exclusions === undefined || !Array.isArray(exclusions) ) {
+                        exclusions = [];
+                        descriptor.exclusion_list = exclusions;
+                    }
+                    //
+                    if ( found_shapes.length ) {  // z_top()
+                        if ( found_shapes[0] === this.z_top() ) {
+                            found_shapes.shift();
+                        }
+                        while ( found_shapes.length && (depth > 0) ) {
+                            depth--;
+                            let ith = found_shapes.shift();
+                            let ex_ith = exclusions.indexOf(ith);
+                            if ( ex_ith >= 0 ) {
+                                exclusions.splice(ex_ith,1);
+                            } else {
+                                exclusions.push(ith);
+                            }
+                        }
+                    }
+                    //
+                }
+            }
+
+        }
+
+        remove_top_if_empty_group(pars) {
+            if ( !pars ) return
+            let descriptor = this.z_top_object();
+            if ( descriptor.shape === 'group' ) {
+                let children = descriptor.children;
+                if ( !children ) {
+                    let exception = pars.except;
+                    if ( (exception !== undefined) && (this.selected === exception) ) return
+                    this.z_list.pop();
+                }
+            }
+        }
+
+
+        update_selector_group(pars) {
+            if ( !pars ) return
+            let descriptor = this.z_top_object();
+            if ( descriptor.shape === 'group' ) {
+                let children = descriptor.children;
+                if ( !children ) {
+                    descriptor.select_list = pars.list;
+                    descriptor.do_draw_selections = true;
+                }
+            }
+        }
+
     }
 
     /* src/CanDraw.svelte generated by Svelte v3.44.1 */
@@ -1667,7 +2310,7 @@
     		m(target, anchor) {
     			insert(target, div, anchor);
     			append(div, canvas);
-    			/*canvas_binding*/ ctx[13](canvas);
+    			/*canvas_binding*/ ctx[18](canvas);
 
     			if (!mounted) {
     				dispose = listen(canvas, "mousemove", /*mouse_move*/ ctx[7]);
@@ -1703,7 +2346,7 @@
     		o: noop,
     		d(detaching) {
     			if (detaching) detach(div);
-    			/*canvas_binding*/ ctx[13](null);
+    			/*canvas_binding*/ ctx[18](null);
     			mounted = false;
     			dispose();
     		}
@@ -1719,7 +2362,14 @@
     	let { doc_top = 0 } = $$props;
     	let { selected = false } = $$props;
     	let { mouse_to_shape = false } = $$props;
+    	let { secondary_shape = false } = $$props;
+    	let { multi_select = false } = $$props;
+    	let { z_list = false } = $$props;
     	let { canvas_mouse = { x: 0, y: 0 } } = $$props;
+    	let { canvas_changed = false } = $$props;
+    	let { internal_draw = false } = $$props;
+    	let old_canvas_left = doc_left;
+    	let old_canvas_top = doc_top;
 
     	// ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
     	//
@@ -1732,7 +2382,7 @@
     		if (!drawit) return;
 
     		if (!ctxt && the_canvas) {
-    			$$invalidate(11, ctxt = the_canvas.getContext("2d"));
+    			$$invalidate(16, ctxt = the_canvas.getContext("2d"));
     			drawit.setContext(ctxt);
     		}
 
@@ -1748,23 +2398,42 @@
     		} else if (command.update !== undefined) {
     			drawit.update(pars);
     		} else if (command.searching !== undefined) {
-    			$$invalidate(9, mouse_to_shape = drawit.mouse_in_shape(pars));
+    			if (pars.no_change) {
+    				$$invalidate(10, secondary_shape = drawit.mouse_in_shape(pars));
+    			} else {
+    				$$invalidate(9, mouse_to_shape = drawit.mouse_in_shape(pars));
+    			}
+    		} else if (command.multi_select !== undefined) {
+    			$$invalidate(11, multi_select = drawit.all_bounds_intersect(pars));
+    		} else if (command.z_list !== undefined) {
+    			$$invalidate(12, z_list = drawit.z_list_deep_clone());
     		}
 
+    		//
     		$$invalidate(8, selected = drawit.selected_object());
     	});
+
+    	let resize_happening = false;
 
     	afterUpdate(() => {
     		if (drawit) {
     			drawit.canvas_size(width, height);
+    			drawit.clear();
     			drawit.redraw();
     		}
-    	});
+
+    		if (resize_happening) {
+    			const rect = the_canvas.getBoundingClientRect();
+    			console.log(`changed canvas later maybe: ${rect.left} ${rect.top}`);
+    			resize_happening = false;
+    			$$invalidate(14, canvas_changed = true);
+    		}
+    	}); //console.log(`canvas_changed ${canvas_changed}`)
 
     	function mouse_move(evt) {
     		const rect = the_canvas.getBoundingClientRect();
-    		$$invalidate(10, canvas_mouse.x = evt.clientX - rect.left, canvas_mouse);
-    		$$invalidate(10, canvas_mouse.y = evt.clientY - rect.top, canvas_mouse);
+    		$$invalidate(13, canvas_mouse.x = evt.clientX - rect.left, canvas_mouse);
+    		$$invalidate(13, canvas_mouse.y = evt.clientY - rect.top, canvas_mouse);
     	}
 
     	function canvas_binding($$value) {
@@ -1783,14 +2452,28 @@
     		if ('doc_top' in $$props) $$invalidate(5, doc_top = $$props.doc_top);
     		if ('selected' in $$props) $$invalidate(8, selected = $$props.selected);
     		if ('mouse_to_shape' in $$props) $$invalidate(9, mouse_to_shape = $$props.mouse_to_shape);
-    		if ('canvas_mouse' in $$props) $$invalidate(10, canvas_mouse = $$props.canvas_mouse);
+    		if ('secondary_shape' in $$props) $$invalidate(10, secondary_shape = $$props.secondary_shape);
+    		if ('multi_select' in $$props) $$invalidate(11, multi_select = $$props.multi_select);
+    		if ('z_list' in $$props) $$invalidate(12, z_list = $$props.z_list);
+    		if ('canvas_mouse' in $$props) $$invalidate(13, canvas_mouse = $$props.canvas_mouse);
+    		if ('canvas_changed' in $$props) $$invalidate(14, canvas_changed = $$props.canvas_changed);
+    		if ('internal_draw' in $$props) $$invalidate(15, internal_draw = $$props.internal_draw);
     	};
 
     	$$self.$$.update = () => {
-    		if ($$self.$$.dirty & /*the_canvas, drawit, ctxt, width, height*/ 6211) {
+    		if ($$self.$$.dirty & /*the_canvas, drawit, ctxt, width, height*/ 196675) {
     			if (the_canvas && !drawit) {
-    				$$invalidate(11, ctxt = the_canvas.getContext("2d"));
-    				$$invalidate(12, drawit = new DrawTools(ctxt, width, height));
+    				$$invalidate(16, ctxt = the_canvas.getContext("2d"));
+    				$$invalidate(17, drawit = new DrawTools(ctxt, width, height));
+    				$$invalidate(15, internal_draw = drawit);
+    			}
+    		}
+
+    		if ($$self.$$.dirty & /*doc_left, doc_top*/ 48) {
+    			{
+    				if (old_canvas_left !== doc_left || old_canvas_top !== doc_top) {
+    					resize_happening = true;
+    				}
     			}
     		}
     	};
@@ -1806,7 +2489,12 @@
     		mouse_move,
     		selected,
     		mouse_to_shape,
+    		secondary_shape,
+    		multi_select,
+    		z_list,
     		canvas_mouse,
+    		canvas_changed,
+    		internal_draw,
     		ctxt,
     		drawit,
     		canvas_binding
@@ -1832,7 +2520,12 @@
     				doc_top: 5,
     				selected: 8,
     				mouse_to_shape: 9,
-    				canvas_mouse: 10
+    				secondary_shape: 10,
+    				multi_select: 11,
+    				z_list: 12,
+    				canvas_mouse: 13,
+    				canvas_changed: 14,
+    				internal_draw: 15
     			},
     			add_css
     		);
