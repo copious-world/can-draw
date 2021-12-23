@@ -711,6 +711,8 @@ export class DrawTools extends ZList {
         this.shadowColor = false
         this.shadowOffsetX = false
         this.shadowOffsetY = false
+        //
+        this.hilights = false
     }
 
     setContext(ctxt) {
@@ -831,10 +833,13 @@ export class DrawTools extends ZList {
             if ( pars.role ) {      // a lifted parameter -- may generalize to others.
                 descriptor.role = pars.role
             }
+            if ( pars.function ) {      // a lifted parameter -- may generalize to others.
+                descriptor.function = pars.function
+            }
             if ( pars.id ) {      // a lifted parameter -- may generalize to others.
                 descriptor.id = pars.id
             }
-            
+            //
             this.push(descriptor)
             return descriptor    
         }
@@ -1264,7 +1269,7 @@ export class DrawTools extends ZList {
         }
     }
 
-
+/*
     //  polygon
     polygon(pars) {
         if ( !pars ) return
@@ -1305,6 +1310,53 @@ export class DrawTools extends ZList {
         }
 
     }
+*/
+
+
+    //  polygon
+    polygon(pars) {
+        if ( !pars ) return
+        if ( this.ctxt ) {
+            this._scale()
+            let descriptor = this._descriptor("polygon",pars)
+            let ctxt = this.ctxt
+            let [cx,cy,rx,ry] = pars.points
+            let sides = pars.sides
+
+            descriptor.points = []
+            //
+            let rad = Math.sqrt(rx*rx + ry*ry)
+            const edg = (rad / 1.5);
+            const inradius = (edg / 2) * cot(Math.PI / sides);
+            const circumradius = inradius * sec(Math.PI / sides);
+            //
+            for (let s = 0; sides >= s; s++) {
+                const angle = (2.0 * Math.PI * s) / sides;
+                let x = rx * Math.cos(angle) + cx;
+                let y = ry * Math.sin(angle) + cy;
+                //
+                //update_bounds(descriptor,x,y)
+                descriptor.points.push([x,y])
+            }
+
+            let region = false
+            if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
+                region = _line_path_bounds(descriptor,descriptor.points,pars.rotate,true)
+            } else {
+                region = _line_path_bounds(descriptor,descriptor.points,false,true)
+            }
+
+            ctxt.beginPath();
+            this._lines_and_fill(ctxt,pars,region)
+            descriptor.path = region
+            let rotate = ((pars.rotate !== undefined) && pars.rotate && (pars.rotate !== 0.0) ) ? pars.rotate : 0.0
+            descriptor.bounds = ellipse_bounding_rect(cx, cy, rx, ry,rotate)
+
+// test_draw_path(ctxt,descriptor)
+            this._unscale()
+        }
+
+    }
 
 
     change_star_radius(descriptor,ctrl_point,dx,dy,no_r_change) {
@@ -1323,7 +1375,7 @@ export class DrawTools extends ZList {
         //
         let R = Math.sqrt(t_x*t_x + t_y*t_y)
         if ( !no_r_change ) {
-            points[2] = R*1.5
+            points[2] = R //*1.5
         }
         return points
     }
@@ -1525,6 +1577,9 @@ export class DrawTools extends ZList {
             selected.pars = pars
             this.clear()
             this.redraw()
+            if ( this.hilights ) {
+                this.draw_hilights()
+            }
             this.redrawing = false
         }
     }
@@ -1879,6 +1934,37 @@ export class DrawTools extends ZList {
                 descriptor.select_list = pars.list
                 descriptor.do_draw_selections = true
             }
+        }
+    }
+
+    draw_hilights() {
+        if ( this.hilights ) {
+            for ( let hl of this.hilights ) {
+                let [x1,y1,w,h] = hl.bounds
+                if ( this.ctxt ) {
+                    let ctxt = this.ctxt
+                    this._scale()
+                    ctxt.strokeStyle = hl.hilight
+                    ctxt.strokeRect(x1,y1,w,h)
+                    this._unscale()
+                }
+            }
+        }
+    }
+
+    hilight(pars) {
+        if ( !pars ) return
+        let ith = pars.index
+        let line = pars.line
+        if ( ith >= 0 ) {
+            let descriptor = this.ith_object(ith)
+            if ( !this.hilights ) {
+                this.hilights = []
+            }
+            descriptor.hilight = line
+            this.hilights.push(descriptor)
+        } else {
+            this.hilights = false
         }
     }
 
