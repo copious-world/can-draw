@@ -833,15 +833,19 @@ export class DrawTools extends ZList {
     
     
     _descriptor(shape,pars) {
-        if ( this._redraw_descriptor ) return this._redraw_descriptor
+        if ( this._redraw_descriptor ) return this._redraw_descriptor  // this is for redrawing and will be changed
         else {
-            let descriptor = { "shape" : shape, "pars" : pars, "bounds" : [] }
+            // create something new...  most basic field are how and where to draw... special_draw has to be supplied by the app
+            let descriptor = { "shape" : shape, "pars" : pars, "bounds" : [], special_draw : false }
             //
             if ( pars.id ) {      // a lifted parameter -- may generalize to others.
                 descriptor.id = pars.id
             }
             if ( pars.role ) {      // a lifted parameter -- may generalize to others.
                 descriptor.role = pars.role
+            }
+            if ( pars.draw_special ) {  // may be supplied at creation ... but it is made to be set later externally to this module
+                descriptor.draw_special = pars.draw_special  // user will set "draw_special"
             }
 
             for ( let lift_it of this._lifted_fields ) {
@@ -933,6 +937,15 @@ export class DrawTools extends ZList {
         this.gradient = this.grad_list[grad_name]
     }
 
+    draw_special(op) {
+        if ( op.draw_special && (typeof op.draw_special === "function") ) {
+            if ( this.ctxt ) {
+                this._scale()
+                op.draw_special(this.ctxt,op.bounds,op)
+                this._unscale()
+            }    
+        }
+    }
 
     //
     rect(pars) {
@@ -1436,9 +1449,13 @@ export class DrawTools extends ZList {
         for ( let i = 0; i < n; i++ ) {
             let op = this.z_list[i]
             this._redraw_descriptor = op
-            let shape = op.shape
-            let self = this
-            self[shape](op.pars)
+            if ( op.draw_special ) {
+                this.draw_special(op)
+            } else {
+                let shape = op.shape
+                let self = this
+                self[shape](op.pars)                    
+            }
             this._redraw_descriptor = false
         }
         this.redrawing = false
