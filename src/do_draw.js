@@ -713,6 +713,8 @@ export class DrawTools extends ZList {
         this.shadowOffsetY = false
         //
         this.hilights = false
+
+        this._lifted_fields = []
     }
 
     setContext(ctxt) {
@@ -823,6 +825,11 @@ export class DrawTools extends ZList {
             else ctxt.stroke();
         }
     }
+
+    set_lifted(pars) {
+        if ( !pars ) return
+        this._lifted_fields = [].concat(pars.lifted)
+    }
     
     
     _descriptor(shape,pars) {
@@ -830,15 +837,19 @@ export class DrawTools extends ZList {
         else {
             let descriptor = { "shape" : shape, "pars" : pars, "bounds" : [] }
             //
-            if ( pars.role ) {      // a lifted parameter -- may generalize to others.
-                descriptor.role = pars.role
-            }
-            if ( pars.function ) {      // a lifted parameter -- may generalize to others.
-                descriptor.function = pars.function
-            }
             if ( pars.id ) {      // a lifted parameter -- may generalize to others.
                 descriptor.id = pars.id
             }
+            if ( pars.role ) {      // a lifted parameter -- may generalize to others.
+                descriptor.role = pars.role
+            }
+
+            for ( let lift_it of this._lifted_fields ) {
+                if ( pars[lift_it] !== undefined ) {
+                    descriptor[lift_it] =  pars[lift_it]
+                }
+            }
+
             //
             this.push(descriptor)
             return descriptor    
@@ -1269,50 +1280,6 @@ export class DrawTools extends ZList {
         }
     }
 
-/*
-    //  polygon
-    polygon(pars) {
-        if ( !pars ) return
-        if ( this.ctxt ) {
-            this._scale()
-            let descriptor = this._descriptor("polygon",pars)
-            let ctxt = this.ctxt
-            let [cx,cy,rad] = pars.points
-            let sides = pars.sides
-
-            descriptor.points = []
-            //
-            const edg = (rad / 1.5);
-            const inradius = (edg / 2) * cot(Math.PI / sides);
-            const circumradius = inradius * sec(Math.PI / sides);
-            //
-            for (let s = 0; sides >= s; s++) {
-                const angle = (2.0 * Math.PI * s) / sides;
-                let x = circumradius * Math.cos(angle) + cx;
-                let y = circumradius * Math.sin(angle) + cy;
-                //
-                //update_bounds(descriptor,x,y)
-                descriptor.points.push([x,y])
-            }
-
-            let region = false
-            if ( (pars.rotate !== undefined) && ( pars.rotate !== false) && (pars.rotate !== 0.0)  ) {
-                region = _line_path_bounds(descriptor,descriptor.points,pars.rotate,true)
-            } else {
-                region = _line_path_bounds(descriptor,descriptor.points,false,true)
-            }
-
-            ctxt.beginPath();
-            this._lines_and_fill(ctxt,pars,region)
-            descriptor.path = region
-// test_draw_path(ctxt,descriptor)
-            this._unscale()
-        }
-
-    }
-*/
-
-
     //  polygon
     polygon(pars) {
         if ( !pars ) return
@@ -1322,20 +1289,13 @@ export class DrawTools extends ZList {
             let ctxt = this.ctxt
             let [cx,cy,rx,ry] = pars.points
             let sides = pars.sides
-
-            descriptor.points = []
             //
-            let rad = Math.sqrt(rx*rx + ry*ry)
-            const edg = (rad / 1.5);
-            const inradius = (edg / 2) * cot(Math.PI / sides);
-            const circumradius = inradius * sec(Math.PI / sides);
+            descriptor.points = []
             //
             for (let s = 0; sides >= s; s++) {
                 const angle = (2.0 * Math.PI * s) / sides;
                 let x = rx * Math.cos(angle) + cx;
                 let y = ry * Math.sin(angle) + cy;
-                //
-                //update_bounds(descriptor,x,y)
                 descriptor.points.push([x,y])
             }
 
@@ -1352,7 +1312,6 @@ export class DrawTools extends ZList {
             let rotate = ((pars.rotate !== undefined) && pars.rotate && (pars.rotate !== 0.0) ) ? pars.rotate : 0.0
             descriptor.bounds = ellipse_bounding_rect(cx, cy, rx, ry,rotate)
 
-// test_draw_path(ctxt,descriptor)
             this._unscale()
         }
 
