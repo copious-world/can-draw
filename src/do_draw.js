@@ -836,7 +836,7 @@ export class DrawTools extends ZList {
         if ( this._redraw_descriptor ) return this._redraw_descriptor  // this is for redrawing and will be changed
         else {
             // create something new...  most basic field are how and where to draw... special_draw has to be supplied by the app
-            let descriptor = { "shape" : shape, "pars" : pars, "bounds" : [], special_draw : false }
+            let descriptor = { "shape" : shape, "pars" : pars, "bounds" : [], special_draw : false, use_backing: false }
             //
             if ( pars.id ) {      // a lifted parameter -- may generalize to others.
                 descriptor.id = pars.id
@@ -846,6 +846,9 @@ export class DrawTools extends ZList {
             }
             if ( pars.draw_special ) {  // may be supplied at creation ... but it is made to be set later externally to this module
                 descriptor.draw_special = pars.draw_special  // user will set "draw_special"
+            }
+            if ( pars.use_backing ) {  // may be supplied at creation ... but it is made to be set later externally to this module
+                descriptor.use_backing = pars.use_backing  // user will set "use_backing"
             }
 
             for ( let lift_it of this._lifted_fields ) {
@@ -1450,6 +1453,11 @@ export class DrawTools extends ZList {
             let op = this.z_list[i]
             this._redraw_descriptor = op
             if ( op.draw_special ) {
+                if ( op.use_backing ) {
+                    let shape = op.shape
+                    let self = this
+                    self[shape](op.pars)    
+                }
                 this.draw_special(op)
             } else {
                 let shape = op.shape
@@ -1460,7 +1468,6 @@ export class DrawTools extends ZList {
         }
         this.redrawing = false
     }
-
 
     //
     reverse_redraw() {
@@ -1547,6 +1554,7 @@ export class DrawTools extends ZList {
     }
 
     update(pars) {
+        if ( !pars ) return 
         let selected = this.selected_object()
         if ( selected ) {
             this.redrawing = true
@@ -1560,8 +1568,8 @@ export class DrawTools extends ZList {
         }
     }
 
-
     update_by_id(pars) {
+        if ( !pars ) return 
         let id = pars.id
         let role = pars.role
         if ( id && role ) {
@@ -1572,6 +1580,12 @@ export class DrawTools extends ZList {
             }
             this.redrawing = false
         }
+    }
+
+    set_special(pars) {
+        if ( !pars ) return                             // use backing can be false
+        if ( (pars.draw_special === undefined) || (pars.use_backing === undefined) ) return
+        this.update_by_id(pars)
     }
 
 
