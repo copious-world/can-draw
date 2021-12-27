@@ -1579,13 +1579,21 @@ export class DrawTools extends ZList {
                 selected.pars = pars
             }
             this.redrawing = false
+            return selected
         }
+        return false
     }
 
+    // set special
+    // set up the draw_special pathway for a component... backing set in the graphic context by the editor...
     set_special(pars) {
         if ( !pars ) return                             // use backing can be false
         if ( (pars.draw_special === undefined) || (pars.use_backing === undefined) ) return
-        this.update_by_id(pars)
+        let descr = this.update_by_id(pars)
+        if ( descr ) {
+            descr.draw_special = pars.draw_special
+            descr.use_backing = pars.use_backing
+        }
     }
 
 
