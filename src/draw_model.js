@@ -11,6 +11,7 @@ class Layer {
     }
 }
 
+// ----
 class Drawing {
 
     constructor() {

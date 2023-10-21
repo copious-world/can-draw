@@ -1,3 +1,47 @@
+/*
+
+
+// file: worker.js
+
+function getGradientColor(percent) {
+    const canvas = new OffscreenCanvas(100, 1);
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, 'red');
+    gradient.addColorStop(1, 'blue');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, ctx.canvas.width, 1);
+    const imgd = ctx.getImageData(0, 0, ctx.canvas.width, 1);
+    const colors = imgd.data.slice(percent * 4, percent * 4 + 4);
+    return `rgba(${colors[0]}, ${colors[1]}, ${colors[2]}, ${colors[])`;
+}
+
+getGradientColor(40);  // rgba(152, 0, 104, 255 )
+
+
+const offscreen = document.querySelector('canvas').transferControlToOffscreen();
+const worker = new Worker('myworkerurl.js');
+worker.postMessage({ canvas: offscreen }, [offscreen]);
+
+
+
+if (navigator.storage && navigator.storage.estimate) {
+  const quota = await navigator.storage.estimate();
+  // quota.usage -> Number of bytes used.
+  // quota.quota -> Maximum number of bytes available.
+  const percentageUsed = (quota.usage / quota.quota) * 100;
+  console.log(`You've used ${percentageUsed}% of the available storage.`);
+  const remaining = quota.quota - quota.usage;
+  console.log(`You can write up to ${remaining} more bytes.`);
+}
+
+
+
+*/
+
+
+
+
 /**
  * @param {Float} n angle
  * @return {Float} cotangeante
